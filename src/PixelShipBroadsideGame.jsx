@@ -2,8 +2,25 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const W = 960;
 const H = 540;
-const SEA_Y = 332;
+const WORLD_W = 2400;
+const WORLD_H = 1600;
 const PI2 = Math.PI * 2;
+const JOY_RADIUS = 95;
+const JOY_DEADZONE = 0.08;
+
+// Ship physics tuning, all per-millisecond (dt is clamped to 32ms in the loop).
+const RUDDER_RATE = 0.0067;
+const MAX_ANGULAR_ACC = 0.0000045;
+const ANGULAR_DRAG = 0.004;
+const MIN_TURN_AUTHORITY = 0.2;
+const FORWARD_ACCEL = 0.000086;
+const DRAG_LINEAR = 0.00009;
+const DRAG_QUADRATIC = 0.0044;
+const LATERAL_DAMP = 0.02;
+const REVERSE_FRAC = 0.35;
+
+const SHIP_CELL = 2;
+
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -13,6 +30,7 @@ const dist2 = (ax, ay, bx, by) => {
   return dx * dx + dy * dy;
 };
 const sign = (n) => (n < 0 ? -1 : 1);
+const normalizeAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 function hexToRgb(hex) {
   const h = hex.replace("#", "");
@@ -26,19 +44,99 @@ function shade(hex, amt) {
   return `rgb(${f(r)},${f(g)},${f(b)})`;
 }
 
+// Top-down frigate silhouette, hand-drawn once and palette-swapped for both ships.
+// Bow at row 0, stern at row 31; 13 columns wide, centerline at column 6.
+const SHIP_GRID = [
+  "......O......",
+  ".....OhO.....",
+  "....OhhhO....",
+  "...OhhhhhO...",
+  "..OhhhhhhhO..",
+  ".OHhhhhhhhHO.",
+  "OHhDDDDDDDhHO",
+  "OHhDDDDDDDhHO",
+  "OHhDDDDDDDhHO",
+  "OHhDDDDDDDhHO",
+  "CHhDDDDDDDhHC",
+  "OHhDDDdDDDhHO",
+  "OHhDDWMWDDhHO",
+  "OHhDDDDDDDhHO",
+  "CHhDDDDDDDhHC",
+  "OHhDDDDDDDhHO",
+  "OHhDDDdDDDhHO",
+  "OHhDDDDDDDhHO",
+  "CHhDDDDDDDhHC",
+  "OHhDDDDDDDhHO",
+  "OHhDWWMWWDhHO",
+  "OHhDDDDDDDhHO",
+  "CHhDDDDDDDhHC",
+  "OHhDDDDDDDhHO",
+  "OHhDDDdDDDhHO",
+  "OHhDDDDDDDhHO",
+  "OHhDDDDDDDhHO",
+  "OHhDDDDDDDhHO",
+  "OHhDDDDDDDhHO",
+  "OHhTTTTTTThHO",
+  "OHhTTFFFTThHO",
+  ".OHhhhhhhhHO.",
+];
+const SHIP_GRID_W = 13;
+const SHIP_GRID_H = SHIP_GRID.length;
+const SHIP_HALF_LEN = (SHIP_GRID_H * SHIP_CELL) / 2;
+
+function drawSpriteGrid(ctx, grid, originX, originY, cell, colorFor) {
+  for (let row = 0; row < grid.length; row++) {
+    const line = grid[row];
+    for (let col = 0; col < line.length; col++) {
+      const ch = line[col];
+      if (ch === ".") continue;
+      const color = colorFor(ch);
+      if (!color) continue;
+      ctx.fillStyle = color;
+      ctx.fillRect(Math.round(originX + col * cell), Math.round(originY + row * cell), cell, cell);
+    }
+  }
+}
+
+function shipColorFor(s) {
+  const wood = s.hue;
+  const outline = shade(wood, -55);
+  const hullDark = shade(wood, -18);
+  const hullLight = shade(wood, 20);
+  const deck = shade(s.trim, -14);
+  const deckSeam = shade(s.trim, -36);
+  const sailShadow = "rgba(10,16,22,0.22)";
+  return (ch) => {
+    switch (ch) {
+      case "O": return outline;
+      case "H": return hullDark;
+      case "h": return hullLight;
+      case "D": return deck;
+      case "d": return deckSeam;
+      case "C": return "#161616";
+      case "M": return shade("#3a2a18", -10);
+      case "W": return sailShadow;
+      case "T": return s.trim;
+      case "F": return s.flag;
+      default: return null;
+    }
+  };
+}
+
 function makeShip(side, level = 1) {
   const player = side === "player";
   return {
     side,
-    x: player ? 190 : 760,
-    y: player ? 250 : 170,
-    vx: player ? 0.18 : -0.15,
-    vy: 0,
+    x: 0,
+    y: 0,
     angle: player ? 0 : Math.PI,
-    targetAngle: player ? 0 : Math.PI,
-    speed: player ? 0.2 : 0.32,
-    maxSpeed: player ? 1.38 : 1.16 + level * 0.03,
-    turnRate: player ? 0.030 : 0.024,
+    angularVel: 0,
+    rudder: 0,
+    rudderTarget: 0,
+    speed: 0.06,
+    vx: 0,
+    vy: 0,
+    maxSpeed: player ? 0.13 : 0.105 + level * 0.003,
     health: 100,
     armor: 0,
     reload: rand(0.2, 1.6),
@@ -51,6 +149,7 @@ function makeShip(side, level = 1) {
     hue: player ? "#80512e" : "#5c3d24",
     trim: player ? "#dec9a2" : "#c4a879",
     flag: player ? "#ff5f73" : "#5cb9ff",
+    wakeTrail: [],
   };
 }
 
@@ -65,6 +164,13 @@ function makeParticles() {
 }
 
 function makeGame() {
+  const player = makeShip("player", 1);
+  player.x = WORLD_W / 2 - 260;
+  player.y = WORLD_H / 2;
+  const enemy = makeShip("enemy", 1);
+  enemy.x = WORLD_W / 2 + 310;
+  enemy.y = WORLD_H / 2 - 80;
+
   return {
     started: false,
     over: false,
@@ -74,40 +180,46 @@ function makeGame() {
     gold: 0,
     shake: 0,
     wind: 0,
+    windAngle: rand(0, PI2),
     time: 0,
     phase: 0,
-    seaScroll: 0,
-    clouds: Array.from({ length: 7 }, (_, i) => ({
-      x: rand(0, W),
-      y: rand(28, 96),
-      s: rand(0.8, 1.5),
-      spd: rand(0.04, 0.14),
+    camera: { x: player.x, y: player.y },
+    clouds: Array.from({ length: 7 }, () => ({
+      x: rand(0, WORLD_W),
+      y: rand(0, WORLD_H),
+      s: rand(0.8, 1.6),
+      spd: rand(0.03, 0.1),
       p: rand(0, PI2),
     })),
-    islands: Array.from({ length: 4 }, (_, i) => ({
-      x: rand(80, W - 80),
-      y: rand(258, 306),
-      w: rand(88, 160),
-      h: rand(18, 44),
+    islands: Array.from({ length: 4 }, () => ({
+      x: rand(160, WORLD_W - 160),
+      y: rand(160, WORLD_H - 160),
+      w: rand(96, 170),
+      h: rand(60, 110),
       p: rand(0, PI2),
     })),
-    barrels: Array.from({ length: 4 }, (_, i) => ({
-      x: rand(120, W - 120),
-      y: rand(SEA_Y + 18, H - 30),
+    barrels: Array.from({ length: 4 }, () => ({
+      x: clamp(rand(player.x - 500, player.x + 500), 40, WORLD_W - 40),
+      y: clamp(rand(player.y - 400, player.y + 400), 40, WORLD_H - 40),
       vx: rand(-0.08, 0.08),
       vy: rand(-0.02, 0.02),
       r: 11,
       alive: true,
       gold: 1,
     })),
-    waves: Array.from({ length: 34 }, (_, i) => ({
-      x: (i / 34) * W,
-      y: SEA_Y + rand(-2, 2),
+    waves: Array.from({ length: 40 }, () => ({
+      x: rand(0, WORLD_W),
+      y: rand(0, WORLD_H),
       a: rand(0, PI2),
       s: rand(0.6, 1.2),
     })),
-    player: makeShip("player", 1),
-    enemy: makeShip("enemy", 1),
+    windStreaks: Array.from({ length: 18 }, () => ({
+      x: rand(0, W),
+      y: rand(0, H),
+      len: rand(10, 22),
+    })),
+    player,
+    enemy,
     shots: [],
     particles: makeParticles(),
     rewardTimer: 0,
@@ -205,7 +317,7 @@ function PixelShipBroadsideGame() {
   const rafRef = useRef(0);
   const keysRef = useRef(new Set());
   const gameRef = useRef(makeGame());
-  const controlRef = useRef({ active: false, id: null, x: 0, y: 0, nx: 0, ny: 0, fire: false });
+  const controlRef = useRef({ active: false, id: null, x: 0, y: 0, nx: 0, ny: 0, fire: false, fireId: null });
   const fireRef = useRef({ pressed: false, pulse: 0, victory: false });
   const [ui, setUi] = useState({ started: false, over: false, portrait: false, level: 1, gold: 0, score: 0 });
 
@@ -267,13 +379,13 @@ function PixelShipBroadsideGame() {
       if (x < W * 0.5) {
         ptr.active = true;
         ptr.id = id;
-        ptr.fire = false;
         ptr.x = x;
         ptr.y = y;
         ptr.nx = 0;
         ptr.ny = 0;
       } else {
         ptr.fire = true;
+        ptr.fireId = id;
         fireRef.current.pressed = true;
       }
       if (!gameRef.current.started) {
@@ -289,9 +401,12 @@ function PixelShipBroadsideGame() {
       const cy = H * 0.78;
       const dx = x - cx;
       const dy = y - cy;
-      const r = 95;
-      ptr.nx = clamp(dx / r, -1, 1);
-      ptr.ny = clamp(dy / r, -1, 1);
+      let nx = clamp(dx / JOY_RADIUS, -1, 1);
+      let ny = clamp(dy / JOY_RADIUS, -1, 1);
+      if (Math.abs(nx) < JOY_DEADZONE) nx = 0;
+      if (Math.abs(ny) < JOY_DEADZONE) ny = 0;
+      ptr.nx = nx;
+      ptr.ny = ny;
     };
 
     const onUp = (e) => {
@@ -301,8 +416,9 @@ function PixelShipBroadsideGame() {
         ptr.nx = 0;
         ptr.ny = 0;
       }
-      if (ptr.fire) {
+      if (ptr.fireId === e.pointerId) {
         ptr.fire = false;
+        ptr.fireId = null;
         fireRef.current.pressed = false;
       }
     };
@@ -312,212 +428,170 @@ function PixelShipBroadsideGame() {
     canvas.addEventListener("pointerup", onUp, { passive: false });
     canvas.addEventListener("pointercancel", onUp, { passive: false });
 
+    const toScreenX = (wx) => wx - gameRef.current.camera.x + W / 2;
+    const toScreenY = (wy) => wy - gameRef.current.camera.y + H / 2;
+
+    // Top-down clouds become drifting shadow patches cast on the water.
     const drawCloud = (c, t) => {
-      const x = c.x + Math.sin(t * 0.15 + c.p) * 2;
-      const y = c.y + Math.cos(t * 0.06 + c.p) * 1;
+      const x = toScreenX(c.x + Math.sin(t * 0.15 + c.p) * 2);
+      const y = toScreenY(c.y + Math.cos(t * 0.06 + c.p) * 1);
+      if (x < -80 || x > W + 80 || y < -60 || y > H + 60) return;
       const s = c.s;
-      ctx.fillStyle = "rgba(255,255,255,0.87)";
-      [[0, 6, 14, 6], [10, 0, 20, 10], [25, 6, 14, 5], [13, 7, 17, 6]].forEach(([bx, by, bw, bh]) => {
-        ctx.fillRect(Math.round(x + bx * s), Math.round(y + by * s), Math.round(bw * s), Math.round(bh * s));
-      });
-      ctx.fillStyle = "rgba(255,255,255,0.22)";
-      ctx.fillRect(Math.round(x + 6 * s), Math.round(y + 10 * s), Math.round(34 * s), Math.round(5 * s));
+      ctx.fillStyle = "rgba(4,12,18,0.16)";
+      ctx.fillRect(Math.round(x - 26 * s), Math.round(y - 14 * s), Math.round(52 * s), Math.round(28 * s));
+      ctx.fillStyle = "rgba(4,12,18,0.10)";
+      ctx.fillRect(Math.round(x - 34 * s), Math.round(y - 9 * s), Math.round(68 * s), Math.round(18 * s));
     };
 
     const drawIsland = (isle, t) => {
-      const x = isle.x + Math.sin(t * 0.02 + isle.p) * 0.8;
-      const y = isle.y + Math.cos(t * 0.013 + isle.p) * 0.6;
+      const x = toScreenX(isle.x + Math.sin(t * 0.02 + isle.p) * 0.8);
+      const y = toScreenY(isle.y + Math.cos(t * 0.013 + isle.p) * 0.6);
+      if (x < -220 || x > W + 220 || y < -220 || y > H + 220) return;
       const w = isle.w;
       const h = isle.h;
+      ctx.fillStyle = "rgba(255,255,255,0.16)";
+      ctx.fillRect(Math.round(x - w * 0.52), Math.round(y - h * 0.42), Math.round(w * 1.04), Math.round(h * 0.92));
+      ctx.fillStyle = "#d8c98f";
+      ctx.fillRect(Math.round(x - w * 0.46), Math.round(y - h * 0.36), Math.round(w * 0.92), Math.round(h * 0.8));
       ctx.fillStyle = "#17311f";
-      ctx.fillRect(Math.round(x - w * 0.5), Math.round(y), Math.round(w), Math.round(h));
-      ctx.fillStyle = "#203c26";
-      ctx.fillRect(Math.round(x - w * 0.42), Math.round(y - 6), Math.round(w * 0.84), Math.max(1, Math.round(h * 0.4)));
+      ctx.fillRect(Math.round(x - w * 0.38), Math.round(y - h * 0.28), Math.round(w * 0.76), Math.round(h * 0.64));
       ctx.fillStyle = "#2d5033";
-      ctx.fillRect(Math.round(x - w * 0.28), Math.round(y - 12), Math.round(w * 0.56), Math.max(1, Math.round(h * 0.35)));
+      ctx.fillRect(Math.round(x - w * 0.28), Math.round(y - h * 0.2), Math.round(w * 0.56), Math.round(h * 0.46));
+      ctx.fillStyle = "#3c6b3f";
+      ctx.fillRect(Math.round(x - w * 0.16), Math.round(y - h * 0.1), Math.round(w * 0.32), Math.round(h * 0.26));
       ctx.fillStyle = "#7d7742";
-      ctx.fillRect(Math.round(x - w * 0.18), Math.round(y - 14), Math.round(w * 0.08), 6);
-      ctx.fillRect(Math.round(x + w * 0.04), Math.round(y - 18), Math.round(w * 0.08), 10);
-      ctx.fillStyle = "rgba(255,255,255,0.06)";
-      ctx.fillRect(Math.round(x - w * 0.48), Math.round(y + h - 1), Math.round(w * 0.96), 2);
+      ctx.fillRect(Math.round(x - w * 0.08), Math.round(y - h * 0.04), 4, 4);
+      ctx.fillRect(Math.round(x + w * 0.04), Math.round(y), 4, 4);
     };
 
     const drawBarrel = (b, t) => {
       if (!b.alive) return;
-      const bob = Math.sin(t * 0.07 + b.x * 0.02) * 1.6;
-      const x = b.x;
-      const y = b.y + bob;
-      ctx.fillStyle = "#7d4d25";
-      ctx.fillRect(Math.round(x - 7), Math.round(y - 6), 14, 12);
+      const bob = Math.sin(t * 0.07 + b.x * 0.02) * 1.2;
+      const x = toScreenX(b.x);
+      const y = toScreenY(b.y + bob);
+      if (x < -20 || x > W + 20 || y < -20 || y > H + 20) return;
+      ctx.fillStyle = "rgba(0,0,0,0.18)";
+      ctx.beginPath(); ctx.ellipse(x, y + 2, 8, 5, 0, 0, PI2); ctx.fill();
       ctx.fillStyle = "#4c2e17";
-      ctx.fillRect(Math.round(x - 7), Math.round(y - 2), 14, 1);
-      ctx.fillRect(Math.round(x - 7), Math.round(y + 2), 14, 1);
+      ctx.beginPath(); ctx.arc(x, y, 8, 0, PI2); ctx.fill();
+      ctx.fillStyle = "#7d4d25";
+      ctx.beginPath(); ctx.arc(x, y, 6, 0, PI2); ctx.fill();
+      ctx.fillStyle = "#9a6233";
+      ctx.beginPath(); ctx.arc(x, y, 3, 0, PI2); ctx.fill();
       ctx.fillStyle = "#d8c29c";
-      ctx.fillRect(Math.round(x - 8), Math.round(y - 1), 16, 1);
-      ctx.fillRect(Math.round(x - 8), Math.round(y + 3), 16, 1);
+      ctx.fillRect(Math.round(x - 7), Math.round(y - 1), 14, 1);
     };
 
     const drawSmoke = (p) => {
       const a = clamp(p.life / p.maxLife, 0, 1);
       const s = p.size * (1 + (1 - a) * 1.45);
+      const x = toScreenX(p.x);
+      const y = toScreenY(p.y);
       ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${a * 0.48})`;
-      ctx.fillRect(Math.round(p.x - s), Math.round(p.y - s), Math.round(s * 2), Math.round(s * 2));
+      ctx.fillRect(Math.round(x - s), Math.round(y - s), Math.round(s * 2), Math.round(s * 2));
       ctx.fillStyle = `rgba(255,255,255,${a * 0.18})`;
-      ctx.fillRect(Math.round(p.x - s + 1), Math.round(p.y - s + 1), Math.max(1, Math.round(s * 2 - 2)), Math.max(1, Math.round(s * 2 - 2)));
+      ctx.fillRect(Math.round(x - s + 1), Math.round(y - s + 1), Math.max(1, Math.round(s * 2 - 2)), Math.max(1, Math.round(s * 2 - 2)));
     };
 
     const drawSpark = (p) => {
       const a = clamp(p.life / p.maxLife, 0, 1);
       ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${a})`;
-      ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
+      ctx.fillRect(Math.round(toScreenX(p.x)), Math.round(toScreenY(p.y)), 1, 1);
     };
 
     const drawSplash = (p) => {
       const a = clamp(p.life / p.maxLife, 0, 1);
+      const x = toScreenX(p.x);
+      const y = toScreenY(p.y);
       ctx.fillStyle = `rgba(150,220,255,${a})`;
-      ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
+      ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
       ctx.fillStyle = `rgba(255,255,255,${a * 0.65})`;
-      ctx.fillRect(Math.round(p.x + p.vx * 0.18), Math.round(p.y + p.vy * 0.18), 1, 1);
+      ctx.fillRect(Math.round(x + p.vx * 0.18), Math.round(y + p.vy * 0.18), 1, 1);
     };
 
     const drawShot = (p) => {
+      const x = toScreenX(p.x);
+      const y = toScreenY(p.y);
       ctx.fillStyle = "#151515";
-      ctx.fillRect(Math.round(p.x), Math.round(p.y), 3, 3);
+      ctx.fillRect(Math.round(x), Math.round(y), 3, 3);
       ctx.fillStyle = "rgba(255,255,255,0.18)";
-      ctx.fillRect(Math.round(p.x + 1), Math.round(p.y + 1), 1, 1);
+      ctx.fillRect(Math.round(x + 1), Math.round(y + 1), 1, 1);
     };
 
+    const halfW = (SHIP_GRID_W * SHIP_CELL) / 2;
+    const halfH = (SHIP_GRID_H * SHIP_CELL) / 2;
+
     const drawShip = (s, t) => {
-      const bob = Math.sin(t * 0.06 + s.bob) * 2.2 + Math.sin(t * 0.21 + s.bob * 1.7) * 0.7;
-      const x = s.x;
-      const y = s.y + bob;
-      const facing = s.side === "player" ? 1 : -1;
-      const wood = s.hue;
-      const trim = s.trim;
-      const dark = shade(wood, -30);
-      const light = shade(wood, 24);
-      const mast = "#d6bc89";
-      const sail = s.side === "player" ? "#f1eadb" : "#d6e7f6";
-      const sailShade = s.side === "player" ? "#d0c2a9" : "#b5cee9";
-      const flag = s.flag;
-      const flash = s.flash > 0;
+      const bob = Math.sin(t * 0.05 + s.bob) * 1.1;
+      const x = toScreenX(s.x);
+      const y = toScreenY(s.y) + bob;
       const sink = s.sinking;
-      const broken = s.health < 35;
       ctx.save();
       ctx.translate(Math.round(x), Math.round(y));
-      ctx.scale(facing, 1);
-      ctx.rotate(Math.sin(t * 0.035 + s.bob) * 0.015);
       if (sink > 0) {
-        ctx.translate(0, sink * 16);
-        ctx.rotate(-facing * sink * 0.2);
+        ctx.globalAlpha = clamp(1 - sink * 0.9, 0.08, 1);
+        ctx.translate(0, sink * 10);
+      }
+      ctx.rotate(s.angle + Math.PI / 2);
+
+      drawSpriteGrid(ctx, SHIP_GRID, -halfW, -halfH, SHIP_CELL, shipColorFor(s));
+
+      if (s.flash > 0) {
+        const side = s.flashSide || 1;
+        ctx.fillStyle = "rgba(255,248,196,0.9)";
+        ctx.fillRect(Math.round(side * (halfW + 1)), -3, 5, 6);
+        ctx.fillRect(Math.round(side * (halfW + 1)), 5, 5, 6);
       }
 
-      ctx.fillStyle = "rgba(0,0,0,0.18)";
-      ctx.fillRect(-30, 16, 60, 4);
-
-      // wake
-      ctx.fillStyle = "rgba(255,255,255,0.08)";
-      ctx.fillRect(-30, 10, 10, 1);
-      ctx.fillRect(20, 10, 10, 1);
-
-      // Hull, layered for depth.
-      drawPixelRect(ctx, -26, 5, 52, 7, dark);
-      drawPixelRect(ctx, -24, 3, 48, 5, wood);
-      drawPixelRect(ctx, -21, 1, 42, 4, light);
-      drawPixelRect(ctx, -19, 8, 38, 2, trim);
-      drawPixelRect(ctx, -17, 10, 34, 1, shade(trim, -18));
-      drawPixelRect(ctx, -28, 6, 4, 6, dark);
-      drawPixelRect(ctx, 24, 6, 4, 6, dark);
-
-      // deck
-      drawPixelRect(ctx, -18, -1, 36, 3, shade(wood, 10));
-      drawPixelRect(ctx, -15, -2, 30, 1, shade(trim, 16));
-
-      // cannon ports and black barrels
-      [-13, -5, 3, 11].forEach((oy) => {
-        drawPixelRect(ctx, -24, oy, 2, 1, "#191919");
-        drawPixelRect(ctx, 22, oy, 2, 1, "#191919");
-      });
-      [-14, -6, 2, 10].forEach((oy) => {
-        drawPixelRect(ctx, -23, oy, 3, 2, "#111");
-        drawPixelRect(ctx, 20, oy, 3, 2, "#111");
-      });
-
-      // masts
-      drawPixelRect(ctx, -5, -39, 3, 43, shade(mast, -20));
-      drawPixelRect(ctx, 9, -46, 3, 50, shade(mast, -20));
-      drawPixelRect(ctx, -4, -39, 2, 43, mast);
-      drawPixelRect(ctx, 10, -46, 2, 50, mast);
-      drawPixelRect(ctx, -15, -27, 28, 1, shade(mast, 8));
-      drawPixelRect(ctx, -7, -36, 32, 1, shade(mast, 8));
-      drawPixelRect(ctx, 2, -43, 38, 1, shade(mast, 8));
-
-      // sails with flutter
-      const flutter = Math.sin(t * 0.14 + s.sail) * 1.8;
-      drawPixelRect(ctx, -16, -26, 14, 16, sailShade);
-      drawPixelRect(ctx, -14 + flutter * 0.16, -25, 12, 14, sail);
-      drawPixelRect(ctx, -9, -14, 8, 2, shade(sailShade, -18));
-
-      drawPixelRect(ctx, 1, -34, 20, 22, sailShade);
-      drawPixelRect(ctx, 3 + flutter * 0.16, -33, 18, 20, sail);
-      drawPixelRect(ctx, 3, -13, 14, 2, shade(sailShade, -18));
-
-      drawPixelRect(ctx, 14, -38, 28, 26, sailShade);
-      drawPixelRect(ctx, 16 + flutter * 0.18, -37, 26, 24, sail);
-      drawPixelRect(ctx, 16, -12, 18, 2, shade(sailShade, -18));
-
-      // rigging
-      ctx.fillStyle = "#7b6751";
-      ctx.fillRect(-4, -39, 1, 49);
-      ctx.fillRect(10, -46, 1, 56);
-      ctx.fillRect(-13, -19, 13, 1);
-      ctx.fillRect(-1, -29, 21, 1);
-      ctx.fillRect(11, -34, 22, 1);
-      ctx.fillRect(23, -39, 8, 1);
-
-      // flags
-      drawPixelRect(ctx, -5, -42, 8, 2, flag);
-      drawPixelRect(ctx, 9, -49, 8, 2, flag);
-
-      if (flash) {
-        ctx.fillStyle = "rgba(255,248,196,0.95)";
-        ctx.fillRect(-27, -4, 4, 4);
-        ctx.fillRect(23, -4, 4, 4);
-      }
-
-      if (broken) {
-        ctx.fillStyle = "#2f1d13";
-        ctx.fillRect(-8, 5, 4, 2);
-        ctx.fillRect(5, 7, 4, 2);
-        ctx.fillRect(14, 4, 2, 2);
+      if (s.health < 35) {
+        ctx.fillStyle = "rgba(40,24,16,0.55)";
+        ctx.fillRect(-3, -10, 6, 6);
       }
       if (s.health < 15) {
-        ctx.fillStyle = "#5a3122";
-        ctx.fillRect(-1, 8, 2, 1);
-        ctx.fillRect(9, 9, 2, 1);
+        ctx.fillStyle = "rgba(70,30,20,0.5)";
+        ctx.fillRect(-2, 8, 4, 6);
       }
       ctx.restore();
+    };
+
+    const drawWake = (trail) => {
+      const n = trail.length;
+      for (let i = 0; i < n; i++) {
+        const pt = trail[i];
+        const fade = (i + 1) / n;
+        const alpha = pt.a * fade * 0.5;
+        if (alpha <= 0.012) continue;
+        const sx = toScreenX(pt.x);
+        const sy = toScreenY(pt.y);
+        ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+        ctx.fillRect(Math.round(sx - 1), Math.round(sy - 1), 2, 2);
+      }
     };
 
     const fireBroadside = (shooter, broadside) => {
       const g = gameRef.current;
       shooter.reload = 1.15 + rand(0, 0.25);
       shooter.flash = 0.3;
+      shooter.flashSide = broadside;
       shooter.recoil = 1;
       g.shake = Math.max(g.shake, 2.4);
-      const sideY = shooter.y + Math.sin(g.time * 0.06 + shooter.bob) * 2;
-      const muzzleY = [-11, -4, 3, 10];
-      muzzleY.forEach((off, i) => {
+      const fwdX = Math.cos(shooter.angle);
+      const fwdY = Math.sin(shooter.angle);
+      const rightX = -Math.sin(shooter.angle);
+      const rightY = Math.cos(shooter.angle);
+      const lateral = halfW + 4;
+      const muzzleOffsets = [-11, -3, 5, 13];
+      muzzleOffsets.forEach((off, i) => {
         const ang = shooter.angle + broadside * Math.PI / 2 + (i - 1.5) * 0.03;
         const spd = 3.55 + rand(-0.12, 0.16);
-        const px = shooter.x + Math.cos(ang) * 26;
-        const py = sideY + off;
+        const px = shooter.x + fwdX * off + rightX * broadside * lateral;
+        const py = shooter.y + fwdY * off + rightY * broadside * lateral;
         g.shots.push({
           x: px,
           y: py,
           vx: Math.cos(ang) * spd + shooter.vx * 0.2,
           vy: Math.sin(ang) * spd + shooter.vy * 0.2,
-          life: 300,
+          life: 90,
           owner: shooter.side,
           b: broadside,
           r: 6,
@@ -526,13 +600,43 @@ function PixelShipBroadsideGame() {
           g.particles.sparks.push({ x: px, y: py, vx: rand(-0.25, 0.25), vy: rand(-0.18, 0.1), life: 12, maxLife: 12, r: 255, g: 220, b: 120 });
         }
       });
+      const mx = shooter.x + rightX * broadside * lateral;
+      const my = shooter.y + rightY * broadside * lateral;
       for (let n = 0; n < 9; n++) {
-        g.particles.smoke.push({ x: shooter.x + broadside * 18, y: sideY, vx: rand(-0.12, 0.12), vy: rand(-0.16, -0.02), life: 36, maxLife: 36, size: rand(2, 5), r: 88, g: 88, b: 94 });
+        g.particles.smoke.push({ x: mx, y: my, vx: rand(-0.12, 0.12), vy: rand(-0.16, -0.02), life: 36, maxLife: 36, size: rand(2, 5), r: 88, g: 88, b: 94 });
       }
       for (let n = 0; n < 6; n++) {
-        g.particles.embers.push({ x: shooter.x + broadside * 18, y: sideY, vx: rand(-0.2, 0.2), vy: rand(-0.2, 0.0), life: 18, maxLife: 18, size: rand(1, 2), r: 255, g: rand(120, 200), b: rand(70, 110) });
+        g.particles.embers.push({ x: mx, y: my, vx: rand(-0.2, 0.2), vy: rand(-0.2, 0.0), life: 18, maxLife: 18, size: rand(1, 2), r: 255, g: rand(120, 200), b: rand(70, 110) });
       }
       if (navigator.vibrate) navigator.vibrate(18);
+    };
+
+    const speedFactor = (s) => MIN_TURN_AUTHORITY + (1 - MIN_TURN_AUTHORITY) * clamp(Math.abs(s.speed) / s.maxSpeed, 0, 1);
+
+    // Rudder lag + angular inertia + drag-curve speed + lateral-slip damping, all dt-scaled.
+    const integrateShip = (s, steerInput, thrustInput, dt) => {
+      s.rudderTarget = clamp(steerInput, -1, 1);
+      s.rudder = lerp(s.rudder, s.rudderTarget, clamp(RUDDER_RATE * dt, 0, 1));
+
+      const angularAccel = s.rudder * MAX_ANGULAR_ACC * speedFactor(s);
+      s.angularVel += angularAccel * dt;
+      s.angularVel *= Math.max(0, 1 - ANGULAR_DRAG * dt);
+      s.angle += s.angularVel * dt;
+
+      const dragAccel = sign(s.speed) * (DRAG_LINEAR * Math.abs(s.speed) + DRAG_QUADRATIC * s.speed * s.speed);
+      s.speed += (clamp(thrustInput, -1, 1) * FORWARD_ACCEL - dragAccel) * dt;
+      s.speed = clamp(s.speed, -s.maxSpeed * REVERSE_FRAC, s.maxSpeed);
+
+      const fwdX = Math.cos(s.angle);
+      const fwdY = Math.sin(s.angle);
+      const rightX = -Math.sin(s.angle);
+      const rightY = Math.cos(s.angle);
+      const fwdVel = s.vx * fwdX + s.vy * fwdY;
+      const latVel = s.vx * rightX + s.vy * rightY;
+      const newFwd = lerp(fwdVel, s.speed, clamp(0.02 * dt, 0, 1));
+      const newLat = latVel * Math.max(0, 1 - LATERAL_DAMP * dt);
+      s.vx = fwdX * newFwd + rightX * newLat;
+      s.vy = fwdY * newFwd + rightY * newLat;
     };
 
     const update = (dt) => {
@@ -545,8 +649,8 @@ function PixelShipBroadsideGame() {
       const p = g.player;
       const e = g.enemy;
 
-      g.seaScroll += dt * 0.032;
       g.wind = Math.sin(g.time * 0.0004) * 0.35 + Math.sin(g.time * 0.0011) * 0.22;
+      g.windAngle += dt * 0.00004;
       g.shake = Math.max(0, g.shake - dt * 0.04);
       g.rewardTimer += dt;
 
@@ -568,35 +672,54 @@ function PixelShipBroadsideGame() {
       steerInput = clamp(steerInput, -1, 1);
       thrustInput = clamp(thrustInput, -1, 1);
 
-      p.targetAngle += steerInput * p.turnRate;
-      p.angle = lerp(p.angle, p.targetAngle, 0.09);
-      p.speed = clamp(p.speed + thrustInput * 0.018 - 0.002, -0.32, p.maxSpeed);
+      integrateShip(p, steerInput, thrustInput, dt);
 
       const dx = p.x - e.x;
       const dy = p.y - e.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const target = Math.atan2(dy, dx) + Math.PI;
-      const diff = Math.atan2(Math.sin(target - e.angle), Math.cos(target - e.angle));
-      e.angle += clamp(diff, -e.turnRate, e.turnRate) * 0.8;
-      if (dist > 220) e.speed = clamp(e.speed + 0.008, 0.02, e.maxSpeed);
-      else if (dist < 150) e.speed = clamp(e.speed - 0.006, -0.2, e.maxSpeed);
-      else e.speed = clamp(e.speed + 0.002, -0.1, e.maxSpeed);
 
-      const current = Math.sin(g.time * 0.002 + p.y * 0.015) * 0.0028;
-      const current2 = Math.cos(g.time * 0.0018 + e.y * 0.02) * 0.002;
+      // Lead pursuit: aim ahead of the player based on closing speed, not at their instant position.
+      const closingTime = clamp(dist / Math.max(0.04, e.maxSpeed), 0, 900);
+      const leadX = p.x + p.vx * closingTime * 0.4;
+      const leadY = p.y + p.vy * closingTime * 0.4;
+      const bearingToLead = Math.atan2(leadY - e.y, leadX - e.x);
+      const bearingDiff = normalizeAngle(bearingToLead - e.angle);
+      const eSteer = clamp(bearingDiff / 0.6, -1, 1);
 
-      [p, e].forEach((s, idx) => {
-        const facing = idx === 0 ? 1 : -1;
-        const ax = Math.cos(s.angle) * s.speed * 0.52 * facing;
-        const ay = Math.sin(s.angle) * s.speed * 0.52 * facing;
-        s.vx += ax + current * 18 * facing + g.wind * 0.006;
-        s.vy += ay + (idx === 0 ? current2 : current) * 18;
-        s.vx *= 0.992;
-        s.vy *= 0.992;
-        s.x += s.vx;
-        s.y += s.vy;
-        s.x = clamp(s.x, 70, W - 70);
-        s.y = clamp(s.y, 120, SEA_Y + 26);
+      let eThrust;
+      if (dist > 260) eThrust = 1;
+      else if (dist < 140) eThrust = -0.3;
+      else eThrust = 0.35;
+      eThrust *= clamp(1 - Math.abs(bearingDiff) / 1.6, 0.25, 1);
+
+      integrateShip(e, eSteer, eThrust, dt);
+
+      const windPush = g.wind * 0.000022;
+      const windX = Math.cos(g.windAngle) * windPush;
+      const windY = Math.sin(g.windAngle) * windPush;
+
+      [p, e].forEach((s) => {
+        const driftX = windX + Math.sin(g.time * 0.0006 + s.y * 0.002) * 0.000008;
+        const driftY = windY + Math.cos(g.time * 0.0005 + s.x * 0.002) * 0.000008;
+        s.vx += driftX * dt;
+        s.vy += driftY * dt;
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+
+        const margin = 90;
+        if (s.x < margin) s.vx += (margin - s.x) * 0.00004 * dt;
+        if (s.x > WORLD_W - margin) s.vx -= (s.x - (WORLD_W - margin)) * 0.00004 * dt;
+        if (s.y < margin) s.vy += (margin - s.y) * 0.00004 * dt;
+        if (s.y > WORLD_H - margin) s.vy -= (s.y - (WORLD_H - margin)) * 0.00004 * dt;
+
+        const fwdX = Math.cos(s.angle);
+        const fwdY = Math.sin(s.angle);
+        const speedNow = Math.sqrt(s.vx * s.vx + s.vy * s.vy);
+        if (speedNow > 0.01) {
+          s.wakeTrail.push({ x: s.x - fwdX * SHIP_HALF_LEN, y: s.y - fwdY * SHIP_HALF_LEN, a: clamp(speedNow / s.maxSpeed, 0, 1) });
+          if (s.wakeTrail.length > 50) s.wakeTrail.shift();
+        }
+
         s.reload = Math.max(0, s.reload - dt * 0.0015);
         s.flash = Math.max(0, s.flash - dt * 0.02);
         s.recoil = Math.max(0, s.recoil - dt * 0.02);
@@ -605,14 +728,17 @@ function PixelShipBroadsideGame() {
         if (s.health <= 0) s.sinking = Math.min(1, s.sinking + dt * 0.00065);
       });
 
+      g.camera.x = lerp(g.camera.x, p.x + Math.cos(p.angle) * 60, clamp(0.0025 * dt, 0, 1));
+      g.camera.y = lerp(g.camera.y, p.y + Math.sin(p.angle) * 60, clamp(0.0025 * dt, 0, 1));
+
       // Boat-to-barrel pickups.
       for (const b of g.barrels) {
         if (!b.alive) continue;
         b.x += b.vx * dt * 0.06;
         b.y += b.vy * dt * 0.06;
         b.vx += Math.sin(g.time * 0.001 + b.x * 0.01) * 0.00001;
-        b.x = clamp(b.x, 40, W - 40);
-        b.y = clamp(b.y, SEA_Y + 14, H - 22);
+        b.x = clamp(b.x, 40, WORLD_W - 40);
+        b.y = clamp(b.y, 40, WORLD_H - 40);
         if (dist2(b.x, b.y, p.x, p.y) < 650) {
           b.alive = false;
           p.health = clamp(p.health + 15, 0, 100);
@@ -623,19 +749,22 @@ function PixelShipBroadsideGame() {
         }
       }
 
-      // Player and enemy broadside logic.
-      const sideToEnemy = Math.abs(Math.atan2(Math.sin((Math.atan2(dy, dx) - p.angle) - Math.PI / 2), Math.cos((Math.atan2(dy, dx) - p.angle) - Math.PI / 2)));
-      const enemyBroadside = Math.abs(p.y - e.y) < 42 && dist < 300;
-      const playerBroadsideLeft = Math.atan2(dy, dx) - p.angle > 0;
-      const playerBroadsideRight = !playerBroadsideLeft;
-      const enemyCanSee = Math.abs(diff) < 0.5 && dist < 280;
+      // Player and enemy broadside logic: fire when the target sits in the ~90deg arc off either flank.
+      const ARC_HALF = 0.5;
+      const FIRE_RANGE = 320;
 
-      if (fireHeld && p.reload <= 0 && !g.over) {
-        fireBroadside(p, playerBroadsideLeft ? -1 : 1);
+      const bearingFromPlayer = normalizeAngle(Math.atan2(e.y - p.y, e.x - p.x) - p.angle);
+      const playerArcSide = Math.abs(Math.abs(bearingFromPlayer) - Math.PI / 2) < ARC_HALF ? sign(bearingFromPlayer) : 0;
+
+      const bearingFromEnemy = normalizeAngle(Math.atan2(p.y - e.y, p.x - e.x) - e.angle);
+      const enemyArcSide = Math.abs(Math.abs(bearingFromEnemy) - Math.PI / 2) < ARC_HALF ? sign(bearingFromEnemy) : 0;
+
+      if (fireHeld && p.reload <= 0 && !g.over && playerArcSide !== 0 && dist < FIRE_RANGE) {
+        fireBroadside(p, playerArcSide);
         g.score += 1;
       }
-      if (e.reload <= 0 && enemyBroadside && enemyCanSee) {
-        fireBroadside(e, Math.atan2(p.y - e.y, p.x - e.x) > e.angle ? 1 : -1);
+      if (e.reload <= 0 && enemyArcSide !== 0 && dist < FIRE_RANGE) {
+        fireBroadside(e, enemyArcSide);
       }
 
       // Cannonballs.
@@ -644,8 +773,7 @@ function PixelShipBroadsideGame() {
         b.life -= 1;
         b.x += b.vx;
         b.y += b.vy;
-        b.vy += 0.012;
-        if (b.life <= 0 || b.x < -30 || b.x > W + 30 || b.y < -30 || b.y > H + 40) {
+        if (b.life <= 0) {
           g.shots.splice(i, 1);
           continue;
         }
@@ -703,6 +831,8 @@ function PixelShipBroadsideGame() {
         g.level += 1;
         p.health = clamp(p.health + 40, 0, 100);
         g.enemy = makeShip("enemy", g.level);
+        g.enemy.x = clamp(p.x + Math.cos(p.angle) * 380 + rand(-80, 80), 120, WORLD_W - 120);
+        g.enemy.y = clamp(p.y + Math.sin(p.angle) * 380 + rand(-80, 80), 120, WORLD_H - 120);
         g.shots = [];
         g.particles = makeParticles();
         g.shake = 0;
@@ -718,67 +848,82 @@ function PixelShipBroadsideGame() {
     const render = () => {
       const g = gameRef.current;
       const t = g.time;
+      const camera = g.camera;
 
-      const sky = ctx.createLinearGradient(0, 0, 0, SEA_Y);
-      sky.addColorStop(0, "#a6e0ff");
-      sky.addColorStop(0.45, "#71b7e5");
-      sky.addColorStop(0.9, "#3476a8");
-      sky.addColorStop(1, "#2a6087");
-      ctx.fillStyle = sky;
-      ctx.fillRect(0, 0, W, SEA_Y);
+      // No horizon from straight overhead — the whole canvas is open water.
+      ctx.fillStyle = "#173f5c";
+      ctx.fillRect(0, 0, W, H);
 
-      const sunX = 122 + Math.sin(t * 0.0003) * 14;
-      const sunY = 76 + Math.cos(t * 0.0002) * 8;
-      const glow = ctx.createRadialGradient(sunX, sunY, 6, sunX, sunY, 110);
-      glow.addColorStop(0, "rgba(255,248,210,0.95)");
-      glow.addColorStop(0.22, "rgba(255,202,120,0.4)");
-      glow.addColorStop(1, "rgba(255,202,120,0)");
-      ctx.fillStyle = glow;
-      ctx.fillRect(0, 0, W, SEA_Y);
-      ctx.fillStyle = "rgba(255,247,214,0.92)";
-      ctx.fillRect(Math.round(sunX - 4), Math.round(sunY - 4), 8, 8);
-      ctx.fillRect(Math.round(sunX + 8), Math.round(sunY - 2), 4, 4);
+      // Tileable dither pattern, locked to world coordinates so it scrolls seamlessly with the camera.
+      const tile = 18;
+      const tx0 = Math.floor((camera.x - W / 2) / tile) - 1;
+      const ty0 = Math.floor((camera.y - H / 2) / tile) - 1;
+      const tx1 = Math.ceil((camera.x + W / 2) / tile) + 1;
+      const ty1 = Math.ceil((camera.y + H / 2) / tile) + 1;
+      for (let ty = ty0; ty <= ty1; ty++) {
+        for (let tx = tx0; tx <= tx1; tx++) {
+          const hash = (tx * 374761393 + ty * 668265263) & 7;
+          if (hash !== 0 && hash !== 1) continue;
+          ctx.fillStyle = hash === 0 ? "rgba(255,255,255,0.045)" : "rgba(0,0,0,0.05)";
+          ctx.fillRect(Math.round(toScreenX(tx * tile)), Math.round(toScreenY(ty * tile)), tile, tile);
+        }
+      }
 
-      // horizon mist
-      ctx.fillStyle = "rgba(255,255,255,0.08)";
-      ctx.fillRect(0, SEA_Y - 10, W, 10);
+      // wave crests: world-space dash segments, respawned near the camera once they drift far away
+      g.waves.forEach((w) => {
+        if (dist2(w.x, w.y, camera.x, camera.y) > 1100 * 1100) {
+          w.x = camera.x + rand(-900, 900);
+          w.y = camera.y + rand(-650, 650);
+        }
+        const x = toScreenX(w.x);
+        const y = toScreenY(w.y + Math.sin(t * 0.04 + w.a) * 2);
+        if (x < -20 || x > W + 20 || y < -20 || y > H + 20) return;
+        ctx.fillStyle = "rgba(255,255,255,0.13)";
+        ctx.fillRect(Math.round(x), Math.round(y), 9, 1);
+        ctx.fillRect(Math.round(x + 3), Math.round(y + 1), 4, 1);
+      });
 
-      // clouds
+      // wind streaks drift across the screen along the current wind direction
+      const windDirX = Math.cos(g.windAngle);
+      const windDirY = Math.sin(g.windAngle);
+      const windSpeed = 0.5 + Math.abs(g.wind) * 2.2;
+      g.windStreaks.forEach((ws) => {
+        ws.x += windDirX * windSpeed;
+        ws.y += windDirY * windSpeed;
+        if (ws.x < -30) ws.x += W + 60;
+        if (ws.x > W + 30) ws.x -= W + 60;
+        if (ws.y < -30) ws.y += H + 60;
+        if (ws.y > H + 30) ws.y -= H + 60;
+        ctx.fillStyle = "rgba(255,255,255,0.07)";
+        ctx.fillRect(Math.round(ws.x), Math.round(ws.y), Math.max(1, Math.round(windDirX * ws.len)), 1);
+        ctx.fillRect(Math.round(ws.x), Math.round(ws.y), 1, Math.max(1, Math.round(windDirY * ws.len)));
+      });
+
+      // clouds — drifting shadow patches cast on the water
       g.clouds.forEach((c) => {
         c.x += c.spd;
-        if (c.x > W + 60) c.x = -90;
+        if (c.x > WORLD_W) c.x -= WORLD_W;
+        if (c.x < 0) c.x += WORLD_W;
         drawCloud(c, t);
       });
 
       // islands
       g.islands.forEach((isle) => drawIsland(isle, t));
 
-      // sea
-      const sea = ctx.createLinearGradient(0, SEA_Y, 0, H);
-      sea.addColorStop(0, "#205f89");
-      sea.addColorStop(1, "#11324d");
-      ctx.fillStyle = sea;
-      ctx.fillRect(0, SEA_Y, W, H - SEA_Y);
+      // barrels
+      g.barrels.forEach((b) => drawBarrel(b, t));
 
-      // water sheen and wave lines
-      for (let y = SEA_Y; y < H; y += 4) {
-        const pulse = Math.sin(t * 0.03 + y * 0.1) * 1.2;
-        ctx.fillStyle = y % 8 === 0 ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.015)";
-        ctx.fillRect(0, Math.round(y + pulse), W, 1);
-      }
-      g.waves.forEach((w, i) => {
-        const x = (w.x - g.seaScroll * w.s) % (W + 30) - 15;
-        const y = SEA_Y + Math.sin(t * 0.04 + w.a) * 2 + (w.y - SEA_Y) * 0.08;
-        ctx.fillStyle = i % 2 === 0 ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)";
-        ctx.fillRect(Math.round(x), Math.round(y), 10, 1);
-        ctx.fillRect(Math.round(x + 4), Math.round(y + 1), 4, 1);
-      });
+      // wakes
+      drawWake(g.player.wakeTrail);
+      drawWake(g.enemy.wakeTrail);
 
       // water particles behind ships
       g.particles.ripples.forEach((p) => {
         const a = clamp(p.life / p.maxLife, 0, 1);
+        const x = toScreenX(p.x);
+        const y = toScreenY(p.y);
         ctx.fillStyle = `rgba(255,255,255,${a * 0.18})`;
-        ctx.fillRect(Math.round(p.x), Math.round(p.y), Math.max(1, Math.round(p.size)), 1);
+        ctx.fillRect(Math.round(x), Math.round(y), Math.max(1, Math.round(p.size)), 1);
       });
 
       drawShip(g.player, t);
@@ -844,24 +989,52 @@ function PixelShipBroadsideGame() {
       ctx.fillText(`Gold ${Math.floor(g.gold)}`, W - 142, 60);
       ctx.fillText(`Level ${g.level}`, W / 2 - 30, 60);
 
+      // off-screen enemy indicator — the follow camera can hide the enemy mid-chase
+      if (!e.sunk && e.health > 0) {
+        const exs = toScreenX(e.x);
+        const eys = toScreenY(e.y);
+        const margin = 26;
+        if (exs < margin || exs > W - margin || eys < margin || eys > H - margin) {
+          const ang = Math.atan2(eys - H / 2, exs - W / 2);
+          const ex = clamp(exs, margin, W - margin);
+          const ey = clamp(eys, margin, H - margin);
+          ctx.save();
+          ctx.translate(ex, ey);
+          ctx.rotate(ang);
+          ctx.fillStyle = "rgba(255,95,115,0.85)";
+          ctx.beginPath();
+          ctx.moveTo(10, 0);
+          ctx.lineTo(-6, -7);
+          ctx.lineTo(-6, 7);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+          ctx.fillStyle = "rgba(255,255,255,0.85)";
+          ctx.font = "11px sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("ENEMY", ex, ey + (ey < H / 2 ? 22 : -16));
+          ctx.textAlign = "start";
+        }
+      }
+
       // left joystick
       const c = controlRef.current;
       const cx = W * 0.19;
       const cy = H * 0.78;
-      const knobX = cx + c.nx * 54;
-      const knobY = cy + c.ny * 54;
+      const knobX = cx + c.nx * JOY_RADIUS;
+      const knobY = cy + c.ny * JOY_RADIUS;
       ctx.fillStyle = "rgba(255,255,255,0.08)";
-      ctx.beginPath(); ctx.arc(cx, cy, 64, 0, PI2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, JOY_RADIUS, 0, PI2); ctx.fill();
       ctx.strokeStyle = "rgba(255,255,255,0.2)";
       ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(cx, cy, 64, 0, PI2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy, JOY_RADIUS, 0, PI2); ctx.stroke();
       ctx.fillStyle = "rgba(255,255,255,0.15)";
       ctx.beginPath(); ctx.arc(knobX, knobY, 30, 0, PI2); ctx.fill();
       ctx.strokeStyle = "rgba(255,255,255,0.28)";
       ctx.beginPath(); ctx.arc(knobX, knobY, 30, 0, PI2); ctx.stroke();
       ctx.fillStyle = "rgba(255,255,255,0.65)";
       ctx.font = "14px sans-serif";
-      ctx.fillText("Turn", cx - 18, cy + 90);
+      ctx.fillText("Turn", cx - 18, cy + JOY_RADIUS + 18);
 
       // fire button
       const fx = W * 0.82;
