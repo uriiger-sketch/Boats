@@ -116,7 +116,7 @@ function makeGame() {
   };
 }
 
-function ControlPad({ controlRef, fireRef, onRestart, onStart, started, over }) {
+function ControlPad({ controlRef, fireRef, onRestart, onStart, started, over, level }) {
   const [portrait, setPortrait] = useState(false);
   useEffect(() => {
     const update = () => setPortrait(window.innerHeight > window.innerWidth);
@@ -144,7 +144,7 @@ function ControlPad({ controlRef, fireRef, onRestart, onStart, started, over }) 
         </div>
 
         <div className="absolute right-4 top-4 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 backdrop-blur-md shadow-lg text-right">
-          <div className="text-[11px] uppercase tracking-[0.35em] text-white/55">Level {String(1 + 0).padStart(1, "0")}</div>
+          <div className="text-[11px] uppercase tracking-[0.35em] text-white/55">Level {String(level).padStart(1, "0")}</div>
           <div className="mt-1 text-sm text-white/80">Gold, score, repairs, glory.</div>
         </div>
 
@@ -688,8 +688,7 @@ function PixelShipBroadsideGame() {
         g.gold += 3 + g.level;
         g.message = "Enemy ship sunk";
         g.messageTimer = 3;
-        g.over = true;
-        setUi((s) => ({ ...s, over: true, score: g.score, gold: g.gold, level: g.level }));
+        setUi((s) => ({ ...s, score: g.score, gold: g.gold, level: g.level }));
       }
       if (p.health <= 0 && !g.over) {
         g.over = true;
@@ -701,7 +700,18 @@ function PixelShipBroadsideGame() {
 
       // Simple progression if victory; new captain, stronger sea.
       if (g.victory && g.rewardTimer > 1600) {
+        g.level += 1;
+        p.health = clamp(p.health + 40, 0, 100);
+        g.enemy = makeShip("enemy", g.level);
+        g.shots = [];
+        g.particles = makeParticles();
+        g.shake = 0;
+        g.victory = false;
+        g.over = false;
         g.rewardTimer = 0;
+        g.message = `Level ${g.level} — new captain spotted`;
+        g.messageTimer = 3;
+        setUi((s) => ({ ...s, level: g.level }));
       }
     };
 
@@ -940,6 +950,7 @@ function PixelShipBroadsideGame() {
               fireRef={fireRef}
               started={ui.started}
               over={ui.over}
+              level={ui.level}
               onStart={start}
               onRestart={restart}
             />
