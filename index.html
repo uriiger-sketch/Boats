@@ -7,12 +7,35 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Broadside" />
     <meta name="theme-color" content="#06101a" />
-    <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <title>Broadside of the Deep</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #06101a; }
+      /* Shown until React mounts; React replaces #root's contents on render. */
+      #boot {
+        position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+        color: #cbd5e1; font: 15px/1.5 system-ui, sans-serif; text-align: center; padding: 24px;
+      }
+      #boot .err { color: #ff8a9b; max-width: 32rem; white-space: pre-wrap; word-break: break-word; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot">Loading Broadside of the Deep…</div>
+    </div>
+    <!-- Surface load/runtime errors instead of failing to a silent white screen. -->
+    <script>
+      window.addEventListener("error", function (e) {
+        var boot = document.getElementById("boot");
+        if (boot) {
+          boot.innerHTML =
+            '<div class="err">Something failed to load.<br><br>' +
+            String((e && (e.message || (e.error && e.error.message))) || e) +
+            "</div>";
+        }
+      });
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
