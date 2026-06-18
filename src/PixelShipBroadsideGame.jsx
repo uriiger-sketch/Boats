@@ -44,41 +44,40 @@ function shade(hex, amt) {
   return `rgb(${f(r)},${f(g)},${f(b)})`;
 }
 
-// Top-down frigate silhouette, hand-drawn once and palette-swapped for both ships.
-// Bow at row 0, stern at row 31; 13 columns wide, centerline at column 6.
+// Viking longship — top-down view. Bow (dragon prow) at row 0, stern at row 27.
+// 13 cols × 28 rows, SHIP_CELL = 2 px each.
+// O=outline  N=near-outline  h=hull-light  T=gunwale
+// D=deck  d=deck-seam  l=deck-highlight  S=shield-1  B=shield-2
+// M=mast  W=sail  w=sail-shadow  G=gold  P=dragon-light  p=dragon-dark  R=eye
 const SHIP_GRID = [
-  "......O......",
-  ".....OhO.....",
-  "....OhhhO....",
-  "...OhhhhhO...",
-  "..OhhhhhhhO..",
-  ".OHhhhhhhhHO.",
-  "OHhDDDDDDDhHO",
-  "OHhDDDDDDDhHO",
-  "OHhDDDDDDDhHO",
-  "OHhDDDDDDDhHO",
-  "CHhDDDDDDDhHC",
-  "OHhDDDdDDDhHO",
-  "OHhDDWMWDDhHO",
-  "OHhDDDDDDDhHO",
-  "CHhDDDDDDDhHC",
-  "OHhDDDDDDDhHO",
-  "OHhDDDdDDDhHO",
-  "OHhDDDDDDDhHO",
-  "CHhDDDDDDDhHC",
-  "OHhDDDDDDDhHO",
-  "OHhDWWMWWDhHO",
-  "OHhDDDDDDDhHO",
-  "CHhDDDDDDDhHC",
-  "OHhDDDDDDDhHO",
-  "OHhDDDdDDDhHO",
-  "OHhDDDDDDDhHO",
-  "OHhDDDDDDDhHO",
-  "OHhDDDDDDDhHO",
-  "OHhDDDDDDDhHO",
-  "OHhTTTTTTThHO",
-  "OHhTTFFFTThHO",
-  ".OHhhhhhhhHO.",
+  "......P......",   // 0  dragon snout tip
+  ".....PpP.....",   // 1  dragon upper head
+  "....OpRpO....",   // 2  dragon face (R=eye/gold)
+  "...ONpDpNO...",   // 3  dragon neck meets bow
+  "..ONhDDDhNO..",   // 4  bow taper outer
+  ".ONhTDDDThNO.",   // 5  bow with gunwale
+  "OSNhTDDDThNSO",   // 6  first shields appear
+  "OSThdDdDdhTSO",   // 7  shields + clinker seams
+  "OBThDlDlDhTBO",   // 8  alt shields + deck highlights
+  "OSThdDdDdhTSO",   // 9
+  "OBThDlDlDhTBO",   // 10
+  "OSThDDGDDhTSO",   // 11 gold ring fitting
+  "OBThDwWwDhTBO",   // 12 sail (from above: horizontal stripe)
+  "OSThMwWwMhTSO",   // 13 mast posts + sail centre
+  "OBThDwWwDhTBO",   // 14 sail
+  "OSThDDGDDhTSO",   // 15 gold ring fitting
+  "OBThDlDlDhTBO",   // 16
+  "OSThdDdDdhTSO",   // 17
+  "OBThDlDlDhTBO",   // 18
+  "OSThdDdDdhTSO",   // 19
+  "OBThDDDDDhTBO",   // 20
+  "OSNhTDDDThNSO",   // 21 stern shields + taper starts
+  ".ONhTDDDThNO.",   // 22
+  "..ONhDDDhNO..",   // 23
+  "...ONhDhNO...",   // 24 narrow stern
+  "....ODdDO....",   // 25 very narrow
+  ".....OdO.....",   // 26 stern tip
+  "......O......",   // 27 last stern pixel
 ];
 const SHIP_GRID_W = 13;
 const SHIP_GRID_H = SHIP_GRID.length;
@@ -99,25 +98,40 @@ function drawSpriteGrid(ctx, grid, originX, originY, cell, colorFor) {
 }
 
 function shipColorFor(s) {
-  const wood = s.hue;
-  const outline = shade(wood, -55);
-  const hullDark = shade(wood, -18);
-  const hullLight = shade(wood, 20);
-  const deck = shade(s.trim, -14);
-  const deckSeam = shade(s.trim, -36);
-  const sailShadow = "rgba(10,16,22,0.22)";
+  const O_c = shade(s.hue, -58);
+  const N_c = shade(s.hue, -30);
+  const h_c = shade(s.hue,  30);
+  const T_c = shade(s.hue,  -6);
+  const D_c = s.trim;
+  const d_c = shade(s.trim, -34);
+  const l_c = shade(s.trim,  28);
+  const S_c = s.flag;
+  const B_c = shade(s.trim,  50);
+  const M_c = "#0c0805";
+  const W_c = shade(s.trim,  60);
+  const w_c = shade(s.trim, -20);
+  const G_c = "#c09028";
+  const P_c = shade(s.flag,  24);
+  const p_c = shade(s.flag, -30);
+  const R_c = "#ffcc18";
   return (ch) => {
     switch (ch) {
-      case "O": return outline;
-      case "H": return hullDark;
-      case "h": return hullLight;
-      case "D": return deck;
-      case "d": return deckSeam;
-      case "C": return "#161616";
-      case "M": return shade("#3a2a18", -10);
-      case "W": return sailShadow;
-      case "T": return s.trim;
-      case "F": return s.flag;
+      case "O": return O_c;
+      case "N": return N_c;
+      case "h": return h_c;
+      case "T": return T_c;
+      case "D": return D_c;
+      case "d": return d_c;
+      case "l": return l_c;
+      case "S": return S_c;
+      case "B": return B_c;
+      case "M": return M_c;
+      case "W": return W_c;
+      case "w": return w_c;
+      case "G": return G_c;
+      case "P": return P_c;
+      case "p": return p_c;
+      case "R": return R_c;
       default: return null;
     }
   };
@@ -146,9 +160,9 @@ function makeShip(side, level = 1) {
     sail: rand(0, PI2),
     sinking: 0,
     sunk: false,
-    hue: player ? "#80512e" : "#5c3d24",
-    trim: player ? "#dec9a2" : "#c4a879",
-    flag: player ? "#ff5f73" : "#5cb9ff",
+    hue: player ? "#5a3015" : "#38200c",
+    trim: player ? "#b87035" : "#8a5228",
+    flag: player ? "#c01828" : "#1830a8",
     wakeTrail: [],
   };
 }
@@ -431,37 +445,65 @@ function PixelShipBroadsideGame() {
     const toScreenX = (wx) => wx - gameRef.current.camera.x + W / 2;
     const toScreenY = (wy) => wy - gameRef.current.camera.y + H / 2;
 
-    // Top-down clouds become drifting shadow patches cast on the water.
+    // Cloud shadows cast on the water — concentric darkening rings for depth.
     const drawCloud = (c, t) => {
-      const x = toScreenX(c.x + Math.sin(t * 0.15 + c.p) * 2);
-      const y = toScreenY(c.y + Math.cos(t * 0.06 + c.p) * 1);
-      if (x < -80 || x > W + 80 || y < -60 || y > H + 60) return;
+      const x = toScreenX(c.x + Math.sin(t * 0.15 + c.p) * 2.2);
+      const y = toScreenY(c.y + Math.cos(t * 0.06 + c.p) * 1.5);
+      if (x < -120 || x > W + 120 || y < -80 || y > H + 80) return;
       const s = c.s;
-      ctx.fillStyle = "rgba(4,12,18,0.16)";
-      ctx.fillRect(Math.round(x - 26 * s), Math.round(y - 14 * s), Math.round(52 * s), Math.round(28 * s));
-      ctx.fillStyle = "rgba(4,12,18,0.10)";
-      ctx.fillRect(Math.round(x - 34 * s), Math.round(y - 9 * s), Math.round(68 * s), Math.round(18 * s));
+      ctx.fillStyle = "rgba(3,8,16,0.06)";
+      ctx.fillRect(Math.round(x - 46 * s), Math.round(y - 22 * s), Math.round(92 * s), Math.round(46 * s));
+      ctx.fillStyle = "rgba(3,8,16,0.10)";
+      ctx.fillRect(Math.round(x - 34 * s), Math.round(y - 17 * s), Math.round(68 * s), Math.round(34 * s));
+      ctx.fillStyle = "rgba(3,8,16,0.15)";
+      ctx.fillRect(Math.round(x - 22 * s), Math.round(y - 11 * s), Math.round(44 * s), Math.round(22 * s));
+      ctx.fillStyle = "rgba(3,8,16,0.20)";
+      ctx.fillRect(Math.round(x - 11 * s), Math.round(y -  6 * s), Math.round(22 * s), Math.round(12 * s));
     };
 
     const drawIsland = (isle, t) => {
-      const x = toScreenX(isle.x + Math.sin(t * 0.02 + isle.p) * 0.8);
-      const y = toScreenY(isle.y + Math.cos(t * 0.013 + isle.p) * 0.6);
+      const x = toScreenX(isle.x);
+      const y = toScreenY(isle.y);
       if (x < -220 || x > W + 220 || y < -220 || y > H + 220) return;
-      const w = isle.w;
-      const h = isle.h;
-      ctx.fillStyle = "rgba(255,255,255,0.16)";
-      ctx.fillRect(Math.round(x - w * 0.52), Math.round(y - h * 0.42), Math.round(w * 1.04), Math.round(h * 0.92));
-      ctx.fillStyle = "#d8c98f";
-      ctx.fillRect(Math.round(x - w * 0.46), Math.round(y - h * 0.36), Math.round(w * 0.92), Math.round(h * 0.8));
-      ctx.fillStyle = "#17311f";
-      ctx.fillRect(Math.round(x - w * 0.38), Math.round(y - h * 0.28), Math.round(w * 0.76), Math.round(h * 0.64));
-      ctx.fillStyle = "#2d5033";
-      ctx.fillRect(Math.round(x - w * 0.28), Math.round(y - h * 0.2), Math.round(w * 0.56), Math.round(h * 0.46));
-      ctx.fillStyle = "#3c6b3f";
-      ctx.fillRect(Math.round(x - w * 0.16), Math.round(y - h * 0.1), Math.round(w * 0.32), Math.round(h * 0.26));
-      ctx.fillStyle = "#7d7742";
-      ctx.fillRect(Math.round(x - w * 0.08), Math.round(y - h * 0.04), 4, 4);
-      ctx.fillRect(Math.round(x + w * 0.04), Math.round(y), 4, 4);
+      const iw = isle.w;
+      const ih = isle.h;
+      // Surf foam halo
+      ctx.fillStyle = "rgba(188,228,255,0.20)";
+      ctx.fillRect(Math.round(x - iw * 0.57), Math.round(y - ih * 0.48), Math.round(iw * 1.14), Math.round(ih * 0.96));
+      // Outer beach (sand shadow/wet edge)
+      ctx.fillStyle = "#b8a052";
+      ctx.fillRect(Math.round(x - iw * 0.50), Math.round(y - ih * 0.40), Math.round(iw * 1.00), Math.round(ih * 0.82));
+      // Sandy beach main
+      ctx.fillStyle = "#cbb462";
+      ctx.fillRect(Math.round(x - iw * 0.46), Math.round(y - ih * 0.36), Math.round(iw * 0.92), Math.round(ih * 0.74));
+      // Beach highlight (sunlit NW side)
+      ctx.fillStyle = "#ddc878";
+      ctx.fillRect(Math.round(x - iw * 0.42), Math.round(y - ih * 0.34), Math.round(iw * 0.40), Math.round(ih * 0.34));
+      // Rocky shore ring
+      ctx.fillStyle = "#786645";
+      ctx.fillRect(Math.round(x - iw * 0.36), Math.round(y - ih * 0.28), Math.round(iw * 0.72), Math.round(ih * 0.58));
+      // Rock shadow patches (irregular)
+      ctx.fillStyle = "#524535";
+      ctx.fillRect(Math.round(x - iw * 0.34), Math.round(y - ih * 0.10), Math.round(iw * 0.10), Math.round(ih * 0.28));
+      ctx.fillRect(Math.round(x + iw * 0.18), Math.round(y - ih * 0.20), Math.round(iw * 0.12), Math.round(ih * 0.22));
+      // Rock highlight pixels
+      ctx.fillStyle = "#9a8860";
+      ctx.fillRect(Math.round(x - iw * 0.30), Math.round(y + ih * 0.12), 4, 3);
+      ctx.fillRect(Math.round(x + iw * 0.24), Math.round(y - ih * 0.04), 4, 3);
+      // Dark forest interior
+      ctx.fillStyle = "#1c481a";
+      ctx.fillRect(Math.round(x - iw * 0.26), Math.round(y - ih * 0.20), Math.round(iw * 0.52), Math.round(ih * 0.42));
+      // Mid canopy
+      ctx.fillStyle = "#2a6022";
+      ctx.fillRect(Math.round(x - iw * 0.18), Math.round(y - ih * 0.15), Math.round(iw * 0.36), Math.round(ih * 0.31));
+      // Bright canopy layer
+      ctx.fillStyle = "#3a7c2e";
+      ctx.fillRect(Math.round(x - iw * 0.12), Math.round(y - ih * 0.10), Math.round(iw * 0.24), Math.round(ih * 0.20));
+      // Sunlit treetop highlight
+      ctx.fillStyle = "#4a9238";
+      ctx.fillRect(Math.round(x - iw * 0.06), Math.round(y - ih * 0.06), Math.round(iw * 0.12), Math.round(ih * 0.10));
+      ctx.fillStyle = "#5aaa44";
+      ctx.fillRect(Math.round(x - iw * 0.02), Math.round(y - ih * 0.04), Math.round(iw * 0.04), Math.round(ih * 0.06));
     };
 
     const drawBarrel = (b, t) => {
@@ -558,13 +600,27 @@ function PixelShipBroadsideGame() {
       const n = trail.length;
       for (let i = 0; i < n; i++) {
         const pt = trail[i];
-        const fade = (i + 1) / n;
-        const alpha = pt.a * fade * 0.5;
-        if (alpha <= 0.012) continue;
-        const sx = toScreenX(pt.x);
-        const sy = toScreenY(pt.y);
-        ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-        ctx.fillRect(Math.round(sx - 1), Math.round(sy - 1), 2, 2);
+        const ageN = (i + 1) / n;
+        const alpha = pt.a * ageN * ageN * 0.72;
+        if (alpha <= 0.010) continue;
+        const sx = Math.round(toScreenX(pt.x));
+        const sy = Math.round(toScreenY(pt.y));
+        // Bright central wake line
+        ctx.fillStyle = `rgba(190,232,255,${alpha})`;
+        ctx.fillRect(sx - 1, sy - 1, 2, 2);
+        // Spreading foam — widens as wake ages (older = smaller i)
+        const spread = Math.max(1, Math.round((1 - ageN) * 5));
+        if (spread >= 2 && alpha > 0.05) {
+          ctx.fillStyle = `rgba(255,255,255,${alpha * 0.35})`;
+          ctx.fillRect(sx - spread - 1, sy, 2, 1);
+          ctx.fillRect(sx + spread,     sy, 2, 1);
+        }
+        // Fresh sparkle just behind stern
+        if (i > n * 0.82 && alpha > 0.18) {
+          ctx.fillStyle = `rgba(255,255,255,${alpha * 0.65})`;
+          ctx.fillRect(sx,     sy - 2, 1, 1);
+          ctx.fillRect(sx + 1, sy + 1, 1, 1);
+        }
       }
     };
 
@@ -850,53 +906,76 @@ function PixelShipBroadsideGame() {
       const t = g.time;
       const camera = g.camera;
 
-      // No horizon from straight overhead — the whole canvas is open water.
-      ctx.fillStyle = "#173f5c";
-      ctx.fillRect(0, 0, W, H);
+      // === ANIMATED 3D PIXEL OCEAN ===
+      // Tile-based wave shader. Each 6×6 pixel tile samples a multi-harmonic height
+      // function projected onto the wind axis, then maps to an 8-stop depth palette:
+      // darkest trough → deep mid → upper slope → sub-crest → white foam cap.
+      const SEA_TILE = 6;
+      const wdx = Math.cos(g.windAngle), wdy = Math.sin(g.windAngle);
+      const wTX0 = Math.floor((camera.x - W / 2) / SEA_TILE);
+      const wTY0 = Math.floor((camera.y - H / 2) / SEA_TILE);
+      const numTX = Math.ceil(W / SEA_TILE) + 2;
+      const numTY = Math.ceil(H / SEA_TILE) + 2;
 
-      // Tileable dither pattern, locked to world coordinates so it scrolls seamlessly with the camera.
-      const tile = 18;
-      const tx0 = Math.floor((camera.x - W / 2) / tile) - 1;
-      const ty0 = Math.floor((camera.y - H / 2) / tile) - 1;
-      const tx1 = Math.ceil((camera.x + W / 2) / tile) + 1;
-      const ty1 = Math.ceil((camera.y + H / 2) / tile) + 1;
-      for (let ty = ty0; ty <= ty1; ty++) {
-        for (let tx = tx0; tx <= tx1; tx++) {
-          const hash = (tx * 374761393 + ty * 668265263) & 7;
-          if (hash !== 0 && hash !== 1) continue;
-          ctx.fillStyle = hash === 0 ? "rgba(255,255,255,0.045)" : "rgba(0,0,0,0.05)";
-          ctx.fillRect(Math.round(toScreenX(tx * tile)), Math.round(toScreenY(ty * tile)), tile, tile);
+      for (let ity = 0; ity < numTY; ity++) {
+        for (let itx = 0; itx < numTX; itx++) {
+          const wtx = wTX0 + itx;
+          const wty = wTY0 + ity;
+          const wx = wtx * SEA_TILE + SEA_TILE * 0.5;
+          const wy = wty * SEA_TILE + SEA_TILE * 0.5;
+          const sx = Math.round(wtx * SEA_TILE - (camera.x - W / 2));
+          const sy = Math.round(wty * SEA_TILE - (camera.y - H / 2));
+
+          // Project onto wave-travel axis (along) and cross axis (across)
+          const along  =  wx * wdx + wy * wdy;
+          const across = -wx * wdy + wy * wdx;
+
+          // Three overlapping harmonics: large swell, mid chop, fine ripple
+          const h1 = Math.sin(along  * 0.0210 + t * 0.00195);
+          const h2 = Math.sin(along  * 0.0395 + t * 0.00335 + across * 0.0082);
+          const h3 = Math.sin(across * 0.0155 + t * 0.00135 + along  * 0.0038);
+          const wh = h1 * 0.50 + h2 * 0.32 + h3 * 0.18;
+
+          // 8-stop palette: deep trough (near-black navy) → foam cap (near-white cyan)
+          let cr, cg, cb;
+          if      (wh < -0.56) { cr =   4; cg =  24; cb =  54; }  // deep trough
+          else if (wh < -0.28) { cr =   8; cg =  40; cb =  80; }  // trough
+          else if (wh < -0.04) { cr =  14; cg =  57; cb = 108; }  // lower slope
+          else if (wh <  0.18) { cr =  20; cg =  77; cb = 138; }  // mid water
+          else if (wh <  0.38) { cr =  28; cg = 102; cb = 162; }  // upper slope
+          else if (wh <  0.54) { cr =  50; cg = 144; cb = 190; }  // sub-crest
+          else if (wh <  0.70) { cr = 125; cg = 200; cb = 232; }  // crest glow
+          else                 { cr = 212; cg = 238; cb = 253; }  // foam cap
+
+          ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+          ctx.fillRect(sx, sy, SEA_TILE, SEA_TILE);
         }
       }
 
-      // wave crests: world-space dash segments, respawned near the camera once they drift far away
-      g.waves.forEach((w) => {
-        if (dist2(w.x, w.y, camera.x, camera.y) > 1100 * 1100) {
-          w.x = camera.x + rand(-900, 900);
-          w.y = camera.y + rand(-650, 650);
-        }
-        const x = toScreenX(w.x);
-        const y = toScreenY(w.y + Math.sin(t * 0.04 + w.a) * 2);
-        if (x < -20 || x > W + 20 || y < -20 || y > H + 20) return;
-        ctx.fillStyle = "rgba(255,255,255,0.13)";
-        ctx.fillRect(Math.round(x), Math.round(y), 9, 1);
-        ctx.fillRect(Math.round(x + 3), Math.round(y + 1), 4, 1);
-      });
-
-      // wind streaks drift across the screen along the current wind direction
+      // Wind streaks — bright pixel dashes drifting along wind direction
       const windDirX = Math.cos(g.windAngle);
       const windDirY = Math.sin(g.windAngle);
-      const windSpeed = 0.5 + Math.abs(g.wind) * 2.2;
+      const windSpeed = 0.45 + Math.abs(g.wind) * 2.0;
+      const wAlpha = 0.09 + Math.abs(g.wind) * 0.13;
       g.windStreaks.forEach((ws) => {
         ws.x += windDirX * windSpeed;
         ws.y += windDirY * windSpeed;
-        if (ws.x < -30) ws.x += W + 60;
-        if (ws.x > W + 30) ws.x -= W + 60;
-        if (ws.y < -30) ws.y += H + 60;
-        if (ws.y > H + 30) ws.y -= H + 60;
-        ctx.fillStyle = "rgba(255,255,255,0.07)";
-        ctx.fillRect(Math.round(ws.x), Math.round(ws.y), Math.max(1, Math.round(windDirX * ws.len)), 1);
-        ctx.fillRect(Math.round(ws.x), Math.round(ws.y), 1, Math.max(1, Math.round(windDirY * ws.len)));
+        if (ws.x < -40) ws.x += W + 80;
+        if (ws.x > W + 40) ws.x -= W + 80;
+        if (ws.y < -40) ws.y += H + 80;
+        if (ws.y > H + 40) ws.y -= H + 80;
+        const lenX = Math.round(windDirX * ws.len);
+        const lenY = Math.round(windDirY * ws.len);
+        // Leading bright dot
+        ctx.fillStyle = `rgba(255,255,255,${wAlpha * 1.7})`;
+        ctx.fillRect(Math.round(ws.x), Math.round(ws.y), 2, 2);
+        // Trailing streak
+        ctx.fillStyle = `rgba(255,255,255,${wAlpha})`;
+        if (Math.abs(lenX) >= Math.abs(lenY)) {
+          ctx.fillRect(Math.round(ws.x - lenX * 0.6), Math.round(ws.y), Math.max(2, Math.abs(Math.round(lenX * 0.55))), 1);
+        } else {
+          ctx.fillRect(Math.round(ws.x), Math.round(ws.y - lenY * 0.6), 1, Math.max(2, Math.abs(Math.round(lenY * 0.55))));
+        }
       });
 
       // clouds — drifting shadow patches cast on the water
