@@ -19,7 +19,7 @@ const DRAG_QUADRATIC = 0.0044;
 const LATERAL_DAMP = 0.02;
 const REVERSE_FRAC = 0.35;
 
-const SHIP_CELL = 2;
+const SHIP_CELL = 3;
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -44,111 +44,373 @@ function shade(hex, amt) {
   return `rgb(${f(r)},${f(g)},${f(b)})`;
 }
 
-// Viking longship — top-down view. Bow (dragon prow) at row 0, stern at row 27.
-// 13 cols × 28 rows, SHIP_CELL = 2 px each.
-// O=outline  N=near-outline  h=hull-light  T=gunwale
-// D=deck  d=deck-seam  l=deck-highlight  S=shield-1  B=shield-2
-// M=mast  W=sail  w=sail-shadow  G=gold  P=dragon-light  p=dragon-dark  R=eye
-const SHIP_GRID = [
-  "......P......",   // 0  dragon snout tip
-  ".....PpP.....",   // 1  dragon upper head
-  "....OpRpO....",   // 2  dragon face (R=eye/gold)
-  "...ONpDpNO...",   // 3  dragon neck meets bow
-  "..ONhDDDhNO..",   // 4  bow taper outer
-  ".ONhTDDDThNO.",   // 5  bow with gunwale
-  "OSNhTDDDThNSO",   // 6  first shields appear
-  "OSThdDdDdhTSO",   // 7  shields + clinker seams
-  "OBThDlDlDhTBO",   // 8  alt shields + deck highlights
-  "OSThdDdDdhTSO",   // 9
-  "OBThDlDlDhTBO",   // 10
-  "OSThDDGDDhTSO",   // 11 gold ring fitting
-  "OBThDwWwDhTBO",   // 12 sail (from above: horizontal stripe)
-  "OSThMwWwMhTSO",   // 13 mast posts + sail centre
-  "OBThDwWwDhTBO",   // 14 sail
-  "OSThDDGDDhTSO",   // 15 gold ring fitting
-  "OBThDlDlDhTBO",   // 16
-  "OSThdDdDdhTSO",   // 17
-  "OBThDlDlDhTBO",   // 18
-  "OSThdDdDdhTSO",   // 19
-  "OBThDDDDDhTBO",   // 20
-  "OSNhTDDDThNSO",   // 21 stern shields + taper starts
-  ".ONhTDDDThNO.",   // 22
-  "..ONhDDDhNO..",   // 23
-  "...ONhDhNO...",   // 24 narrow stern
-  "....ODdDO....",   // 25 very narrow
-  ".....OdO.....",   // 26 stern tip
-  "......O......",   // 27 last stern pixel
-];
-const SHIP_GRID_W = 13;
-const SHIP_GRID_H = SHIP_GRID.length;
-const SHIP_HALF_LEN = (SHIP_GRID_H * SHIP_CELL) / 2;
+// ─── Ship sprite grids ───────────────────────────────────────────────────────
+// Each row must have exactly <width> chars (dots = transparent).
+// Chars: O=outline  N=near-outline  h=hull-light  T=gunwale
+//        D=deck  d=deck-seam  l=highlight  S=shield-1  B=shield-2
+//        M=mast  W=sail  w=sail-shadow  G=gold  P=prow-light  p=prow-dark  R=eye
+//        K=hull-plank-light  k=hull-plank-dark  C=cannon-port
+//        F=flag-bright  f=flag-shadow
+// Hull-side band (last 3-4 rows): shows wooden planks + gun ports for diagonal look.
+// Port (left) cols use k (dark), starboard (right) cols use K (light).
 
-// Small ship (11×22) – Pinnace/Sloop
-const SHIP_GRID_SMALL = [
-  ".....P.....",
-  "....PpP....",
-  "...OpRpO...",
-  "..ONhDhNO..",
-  ".ONhTDThNO.",
-  "OSNhTDThNSO",
-  "OSThdDdhTSO",
-  "OBThDlDhTBO",
-  "OSThdDdhTSO",
-  "OSThwWwhTSO",
-  "OBThMwMhTBO",
-  "OSThwWwhTSO",
-  "OBThDlDhTBO",
-  "OSThdDdhTSO",
-  "OBThDlDhTBO",
-  "OSThdDdhTSO",
-  ".ONhTDThNO.",
-  "..ONhDhNO..",
-  "...ONhNO...",
-  "...ODdDO...",
-  "....OdO....",
-  ".....O.....",
+// Model 0 – Pinnace  (9 × 22)  tiny scout, lateen sail, no cannon ports
+const SHIP_GRID_0 = [
+  "....P....",  // 0  bow tip
+  "...PpP...",  // 1
+  "..ONhNO..",  // 2
+  ".ONhDhNO.",  // 3
+  "OSNhDdNSO",  // 4
+  "OBNhDhNBO",  // 5
+  "OSNhDdNSO",  // 6
+  "OBNhwWNBO",  // 7  lateen sail
+  "OSNhMwNSO",  // 8  mast
+  "OBNhwWNBO",  // 9
+  "OSNhDhNSO",  // 10
+  "OBNhDdNBO",  // 11
+  "OSNhDhNSO",  // 12
+  "OBNhDdNBO",  // 13
+  ".ONhDhNO.",  // 14
+  "..ONhNO..",  // 15
+  "...ONO...",  // 16
+  "....O....",  // 17  stern tip
+  "OkkkKKKKO",  // 18  hull-side planks
+  ".OkkKKKO.",  // 19
+  "..OkKKO..",  // 20
+  ".OOOOOOO.",  // 21  waterline
 ];
 
-// Large ship (15×31) – Galleon/Man-o-War
-const SHIP_GRID_LARGE = [
-  ".......P.......",
-  "......PpP......",
-  ".....OpRpO.....",
-  "....ONpDpNO....",
-  "...ONhDDDhNO...",
-  "..ONhTDDDThNO..",
-  ".ONhTDDDDDThNO.",
-  "OSNhTDDDDDThNSO",
-  "OSThdDdDdDdhTSO",
-  "OBThDlDlDlDhTBO",
-  "OSThdDdDdDdhTSO",
-  "OBThDlDlDlDhTBO",
-  "OSThDDGDGDDhTSO",
-  "OBThDwWwWwDhTBO",
-  "OSThMwWwWwMhTSO",
-  "OBThDwWwWwDhTBO",
-  "OSThDDGDGDDhTSO",
-  "OSThdDdDdDdhTSO",
-  "OBThDlDlDlDhTBO",
-  "OSThdDdDdDdhTSO",
-  "OBThDlDlDlDhTBO",
-  "OSThdDdDdDdhTSO",
-  "OBThDDDDDDDhTBO",
-  "OSNhTDDDDDThNSO",
-  ".ONhTDDDDDThNO.",
-  "..ONhDDDDDhNO..",
-  "...ONhDDDhNO...",
-  "....ONhDhNO....",
-  ".....ODdDO.....",
-  "......OdO......",
-  ".......O.......",
+// Model 1 – Sloop  (11 × 24)  rakish bow, 1 mast, 2 gun ports/side
+const SHIP_GRID_1 = [
+  ".....P.....",  // 0
+  "....PpP....",  // 1
+  "...OpRpO...",  // 2
+  "..ONhDhNO..",  // 3
+  ".ONhTDThNO.",  // 4
+  "OSNhTDThNSO",  // 5
+  "OSThdDdhTSO",  // 6
+  "OBThDlDhTBO",  // 7
+  "OSThdDdhTSO",  // 8
+  "OBThwWwhTBO",  // 9  sail
+  "OSThMwMhTSO",  // 10  mast
+  "OBThwWwhTBO",  // 11
+  "OSThdDdhTSO",  // 12
+  "OBThDlDhTBO",  // 13
+  "OSThdDdhTSO",  // 14
+  "OBThDlDhTBO",  // 15
+  ".ONhTDThNO.",  // 16
+  "..ONhDhNO..",  // 17
+  "...ONhNO...",  // 18
+  "....OdO....",  // 19
+  ".....O.....",  // 20  stern tip
+  "OkCkkkKCKKO",  // 21  hull-side, 2 ports
+  "OkkkkkKKKKO",  // 22
+  ".OOOOOOOOO.",  // 23  waterline
 ];
 
-function getGrid(model) {
-  if (model <= 1) return SHIP_GRID_SMALL;
-  if (model <= 3) return SHIP_GRID;
-  return SHIP_GRID_LARGE;
-}
+// Model 2 – Schooner  (11 × 28)  2 raked masts, 3 gun ports/side, long hull
+const SHIP_GRID_2 = [
+  ".....P.....",  // 0
+  "....PpP....",  // 1
+  "...OpRpO...",  // 2
+  "..ONhDhNO..",  // 3
+  ".ONhTDThNO.",  // 4
+  "OSNhTDThNSO",  // 5
+  "OSThdDdhTSO",  // 6
+  "OBThDlDhTBO",  // 7
+  "OSThdDdhTSO",  // 8
+  "OBThwWwhTBO",  // 9  fore sail
+  "OSThMwMhTSO",  // 10  fore mast
+  "OBThwWwhTBO",  // 11
+  "OSThdDdhTSO",  // 12
+  "OBThDlDhTBO",  // 13
+  "OSThdDdhTSO",  // 14
+  "OBThDlDhTBO",  // 15
+  "OSThdDdhTSO",  // 16
+  "OBThwWwhTBO",  // 17  aft sail
+  "OSThMwMhTSO",  // 18  aft mast
+  "OBThwWwhTBO",  // 19
+  "OSThdDdhTSO",  // 20
+  ".ONhTDThNO.",  // 21
+  "..ONhDhNO..",  // 22
+  "...ONhNO...",  // 23
+  "....OdO....",  // 24  stern tip
+  "OkCkCkKCKKO",  // 25  hull-side, 3 ports
+  "OkkkkkKKKKO",  // 26
+  ".OOOOOOOOO.",  // 27  waterline
+];
+
+// Model 3 – Brigantine  (13 × 30)  square fore + fore-aft aft mast, 4 ports/side
+const SHIP_GRID_3 = [
+  "......P......",  // 0
+  ".....PpP.....",  // 1
+  "....OpRpO....",  // 2
+  "...ONhDhNO...",  // 3
+  "..ONhTDThNO..",  // 4
+  ".ONhTDDDThNO.",  // 5
+  "OSNhTDDDThNSO",  // 6
+  "OSThdDdDdhTSO",  // 7
+  "OBThDlDlDhTBO",  // 8
+  "OSThdDdDdhTSO",  // 9
+  "OBThDDGDDhTBO",  // 10  gold fitting
+  "OSThdwWwdhTSO",  // 11  fore sail
+  "OBThMwWwMhTBO",  // 12  fore mast
+  "OSThdwWwdhTSO",  // 13
+  "OBThDDGDDhTBO",  // 14
+  "OSThdDdDdhTSO",  // 15
+  "OBThDlDlDhTBO",  // 16
+  "OSThdDdDdhTSO",  // 17
+  "OBThDwWwDhTBO",  // 18  aft sail (fore-aft rig, narrower)
+  "OSThDMwMDhTSO",  // 19  aft mast
+  "OBThDwWwDhTBO",  // 20
+  "OSThdDdDdhTSO",  // 21
+  ".ONhTDDDThNO.",  // 22
+  "..ONhDDDhNO..",  // 23
+  "...ONhDhNO...",  // 24
+  "....ODdDO....",  // 25  stern tip
+  "OkCkkkKCKKKKO",  // 26  hull-side, 2 ports
+  "OkkkkkKKKKKKO",  // 27
+  ".OkkkKKKKKKO.",  // 28
+  ".OOOOOOOOOOO.",  // 29  waterline
+];
+
+// Model 4 – Brig  (13 × 30)  2 square masts, 4 ports/side, prominent bowsprit
+const SHIP_GRID_4 = [
+  "......P......",  // 0
+  "......p......",  // 1  bowsprit spike
+  ".....PpP.....",  // 2
+  "....OpRpO....",  // 3
+  "...ONhDhNO...",  // 4
+  "..ONhTDThNO..",  // 5
+  ".ONhTDDDThNO.",  // 6
+  "OSNhTDDDThNSO",  // 7
+  "OSThdDdDdhTSO",  // 8
+  "OBThDlDlDhTBO",  // 9
+  "OSThdDdDdhTSO",  // 10
+  "OBThDDGDDhTBO",  // 11
+  "OSThdwWwdhTSO",  // 12  fore square sail
+  "OBThMwWwMhTBO",  // 13  fore mast
+  "OSThdwWwdhTSO",  // 14
+  "OBThDDGDDhTBO",  // 15
+  "OSThdDdDdhTSO",  // 16
+  "OBThDlDlDhTBO",  // 17
+  "OSThdwWwdhTSO",  // 18  main square sail
+  "OBThMwWwMhTBO",  // 19  main mast (same as fore = both square)
+  "OSThdwWwdhTSO",  // 20
+  ".ONhTDDDThNO.",  // 21
+  "..ONhDDDhNO..",  // 22
+  "...ONhDhNO...",  // 23
+  "....ODdDO....",  // 24
+  ".....OdO.....",  // 25  stern tip
+  "OkCkkkKCKKKKO",  // 26  hull-side
+  "OkkkkkKKKKKKO",  // 27
+  ".OkkkKKKKKKO.",  // 28
+  ".OOOOOOOOOOO.",  // 29  waterline
+];
+
+// Model 5 – Bark  (15 × 32)  3 evenly-spaced masts, 5 ports/side, wide hull
+const SHIP_GRID_5 = [
+  ".......P.......",  // 0
+  "......PpP......",  // 1
+  ".....OpRpO.....",  // 2
+  "....ONhDhNO....",  // 3
+  "...ONhTDThNO...",  // 4
+  "..ONhTDDDThNO..",  // 5
+  ".ONhTDDDDDThNO.",  // 6
+  "OSNhTDDDDDThNSO",  // 7
+  "OSThdDdDdDdhTSO",  // 8
+  "OBThDlDlDlDhTBO",  // 9
+  "OSThdDdDdDdhTSO",  // 10
+  "OSThDDGDGDDhTSO",  // 11  gold fittings
+  "OBThDwWwWwDhTBO",  // 12  fore sail
+  "OSThMwWwWwMhTSO",  // 13  fore mast
+  "OBThDwWwWwDhTBO",  // 14
+  "OSThDDGDGDDhTSO",  // 15  gold
+  "OBThDlDlDlDhTBO",  // 16
+  "OSThdDdDdDdhTSO",  // 17
+  "OBThDwWwWwDhTBO",  // 18  main sail
+  "OSThMwWwWwMhTSO",  // 19  main mast
+  "OBThDwWwWwDhTBO",  // 20
+  "OSThdDdDdDdhTSO",  // 21
+  "OBThDlDlDlDhTBO",  // 22
+  "OSThdDdDdDdhTSO",  // 23
+  "OBThDwWwWwDhTBO",  // 24  mizzen sail
+  "OSThDMwwMDhTSO.",  // 25  mizzen mast (fore-aft)
+  ".ONhTDDDDDThNO.",  // 26
+  "..ONhDDDDDhNO..",  // 27  stern tip
+  "OkCkCkKKKCKKKKO",  // 28  hull-side, 3 ports
+  "OkkkkkkKKKKKKKO",  // 29
+  ".OkkkkkKKKKKKO.",  // 30
+  ".OOOOOOOOOOOOO.",  // 31  waterline
+];
+
+// Model 6 – Frigate  (13 × 36)  PLAYER ship — dragon prow, 3 masts, 6 ports, gold stern gallery
+const SHIP_GRID_6 = [
+  "......P......",  // 0  dragon snout
+  ".....PpP.....",  // 1
+  "....OpRpO....",  // 2  dragon eye
+  "...ONpDpNO...",  // 3  dragon neck
+  "..ONhDDDhNO..",  // 4
+  ".ONhTDDDThNO.",  // 5
+  "OSNhTDDDThNSO",  // 6
+  "OSThdDdDdhTSO",  // 7
+  "OBThDlDlDhTBO",  // 8
+  "OSThdDdDdhTSO",  // 9
+  "OBThDwWwDhTBO",  // 10  fore sail
+  "OSThMwWwMhTSO",  // 11  fore mast
+  "OBThDwWwDhTBO",  // 12
+  "OSThdDdDdhTSO",  // 13
+  "OBThDlDlDhTBO",  // 14
+  "OSThDDGDDhTSO",  // 15  gold fitting
+  "OBThDwWwDhTBO",  // 16  main sail
+  "OSThMwWwMhTSO",  // 17  main mast
+  "OBThDwWwDhTBO",  // 18
+  "OSThDDGDDhTSO",  // 19  gold
+  "OSThdDdDdhTSO",  // 20
+  "OBThDlDlDhTBO",  // 21
+  "OSThdDdDdhTSO",  // 22
+  "OBThDwWwDhTBO",  // 23  mizzen sail
+  "OSThDMwMDhTSO",  // 24  mizzen mast
+  "OBThDwWwDhTBO",  // 25
+  "OSThDDGDDhTSO",  // 26  gold stern gallery
+  "OBThGDGDGhTBO",  // 27  ornate gallery
+  "OSNhTDDDThNSO",  // 28  stern taper
+  ".ONhTDDDThNO.",  // 29
+  "..ONhDDDhNO..",  // 30
+  "...ONhDhNO...",  // 31  stern
+  "OkCkCkKKCKKKO",  // 32  hull-side, 3 ports
+  "OkCkkkKCKKKKO",  // 33
+  "OkkkkkKKKKKKO",  // 34
+  ".OOOOOOOOOOO.",  // 35  waterline
+];
+
+// Model 7 – Galleon  (17 × 36)  3 masts, 6 ports/side, wide stern castle, flag
+const SHIP_GRID_7 = [
+  "........P........",  // 0
+  ".......PpP.......",  // 1
+  "......OpRpO......",  // 2
+  ".....ONhDhNO.....",  // 3
+  "....ONhTDDThNO...",  // 4  (wait, must be 17 chars)
+  "...ONhTDDDThNO...",  // 5  = . × 3 + ONhTDDDThNO + . × 3 = 3+11+3 = 17 ✓
+  "..ONhTDDDDDThNO..",  // 6  = 17 ✓
+  ".ONhTDDDDDDDThNO.",  // 7  = 17 ✓
+  "OSNhTDDDDDDDThNSO",  // 8  = 17 ✓
+  "OSThdDdDdDdDdhTSO",  // 9  = 17 ✓
+  "OBThDlDlDlDlDhTBO",  // 10 = 17 ✓
+  "OSThdDdDdDdDdhTSO",  // 11
+  "OBThDDGDGDGDDhTBO",  // 12  gold fittings
+  "OSThdwWwWwWwdhTSO",  // 13  fore sail
+  "OBThMwWwWwWwMhTBO",  // 14  fore mast
+  "OSThdwWwWwWwdhTSO",  // 15
+  "OBThDDGDGDGDDhTBO",  // 16
+  "OSThdDdDdDdDdhTSO",  // 17
+  "OBThDlDlDlDlDhTBO",  // 18
+  "OSThdwWwWwWwdhTSO",  // 19  main sail
+  "OBThMwWwWwWwMhTBO",  // 20  main mast
+  "OSThdwWwWwWwdhTSO",  // 21
+  "OBThDlDlDlDlDhTBO",  // 22
+  "OSThDwWwFfWwDhTSO",  // 23  mizzen sail with flag colors
+  "OBThDMwwwwMDhTBO.",  // 24  mizzen mast
+  "OSNhTDDDDDDDThNSO",  // 25  stern castle wide
+  ".ONhTDDDDDDDThNO.",  // 26
+  "..ONhDDDDDDDhNO..",  // 27  stern castle
+  "...ONhDDDDDhNO...",  // 28
+  "....ONhDDDhNO....",  // 29
+  ".....ONhDhNO.....",  // 30
+  "......ODdDO......",  // 31  stern tip
+  "OkCkCkKKKCKKCKKKO",  // 32  hull-side, 4 ports = 17 ✓
+  "OkkkkkkkKKKKKKKKO",  // 33  = 17 ✓
+  ".OkkkkkKKKKKKKKO.",  // 34  = 17 ✓
+  ".OOOOOOOOOOOOOOO.",  // 35  waterline = 17 ✓
+];
+
+// Model 8 – Man-o-War  (19 × 38)  widest ship, 3 masts, 8 ports/side, two gun decks
+const SHIP_GRID_8 = [
+  ".........P.........",  // 0  = 19 ✓
+  "........PpP........",  // 1
+  ".......OpRpO.......",  // 2
+  "......ONhDhNO......",  // 3
+  ".....ONhTDDThNO....",  // 4  (must be 19)
+  "....ONhTDDDThNO....",  // 5  = . × 4 + ONhTDDDThNO + . × 4 = 4+11+4 = 19 ✓
+  "...ONhTDDDDDThNO...",  // 6  = 3+13+3 = 19 ✓
+  "..ONhTDDDDDDDThNO..",  // 7  = 2+15+2 = 19 ✓
+  ".ONhTDDDDDDDDDThNO.",  // 8  = 1+17+1 = 19 ✓
+  "OSNhTDDDDDDDDDThNSO",  // 9  = 19 ✓
+  "OSThdDdDdDdDdDdhTSO",  // 10 = 19 ✓
+  "OBThDlDlDlDlDlDhTBO",  // 11 = 19 ✓
+  "OSThdDdDdDdDdDdhTSO",  // 12
+  "OBThDDGDGDGDGDDhTBO",  // 13  gold = 19 ✓
+  "OSThdwWwWwWwWwdhTSO",  // 14  fore sail = 19 ✓
+  "OBThMwWwWwWwWwMhTBO",  // 15  fore mast = 19 ✓
+  "OSThdwWwWwWwWwdhTSO",  // 16
+  "OBThDDGDGDGDGDDhTBO",  // 17
+  "OSThdDdDdDdDdDdhTSO",  // 18
+  "OBThDlDlDlDlDlDhTBO",  // 19
+  "OSThdwWwWwWwWwdhTSO",  // 20  main sail
+  "OBThMwWwWwWwWwMhTBO",  // 21  main mast
+  "OSThdwWwWwWwWwdhTSO",  // 22
+  "OBThDlDlDlDlDlDhTBO",  // 23
+  "OSThdDdDdDdDdDdhTSO",  // 24
+  "OBThDwWwWwWwWwDhTBO",  // 25  mizzen sail
+  "OSThDMwwwwwwwMDhTSO",  // 26  mizzen mast
+  "OSNhTDDDDDDDDDThNSO",  // 27  stern castle
+  ".ONhTDDDDDDDDDThNO.",  // 28
+  "..ONhDDDDDDDDDhNO..",  // 29
+  "...ONhDDDDDDDhNO...",  // 30
+  "....ONhDDDDDhNO....",  // 31
+  ".....ONhDDDhNO.....",  // 32
+  "......ODdDDdDO.....",  // 33  stern tip
+  "OkCkkKkCKKCKkCKKKKO",  // 34  hull-side gun deck 1, 4 ports = 19 ✓
+  "OkCkkkKKKKKKCKKKKKO",  // 35  gun deck 2 = 19 ✓
+  ".OkkkkKKKKKKKKKKKO.",  // 36  = 19 ✓
+  ".OOOOOOOOOOOOOOOOO.",  // 37  waterline = 19 ✓
+];
+
+// Model 9 – Medusa boss  (17 × 36)  tri-serpent bow, green accents, dark hull
+const SHIP_GRID_9 = [
+  "........P........",  // 0  center serpent tip
+  ".......PpP.......",  // 1
+  "......PpRpP......",  // 2  tri-head (extra P flanks)
+  ".....PpODOpP.....",  // 3  three snake necks
+  "....ONhDhDhNO....",  // 4
+  "...ONhTDDDThNO...",  // 5
+  "..ONhTDDDDDThNO..",  // 6
+  ".ONhTDDDDDDDThNO.",  // 7
+  "OSNhTDDDDDDDThNSO",  // 8
+  "OSThdDdDdDdDdhTSO",  // 9
+  "OBThDlDlDlDlDhTBO",  // 10
+  "OSThdDdDdDdDdhTSO",  // 11
+  "OSThdDdDdDdDdhTSO",  // 12  serpent body scales
+  "OBThDSDwWwSDhTBO.",  // 13  fore sail with serpent shields = O B T h D S D w W w S D h T B O . = 17 ✓
+  "OSThdMwWwWwMdhTSO",  // 14  fore mast = O S T h d M w W w W w M d h T S O = 17 ✓
+  "OBThDSDwWwSDhTBO.",  // 15  fore sail
+  "OSThdDdDdDdDdhTSO",  // 16
+  "OSThdDdDdDdDdhTSO",  // 17
+  "OBThDlDlDlDlDhTBO",  // 18
+  "OSThdwWwWwWwdhTSO",  // 19  main sail
+  "OBThMwWwWwWwMhTBO",  // 20  main mast
+  "OSThdwWwWwWwdhTSO",  // 21
+  "OBThDlDlDlDlDhTBO",  // 22
+  "OSThdDdDdDdDdhTSO",  // 23
+  "OBThDwWwWwWwDhTBO",  // 24  mizzen sail
+  "OSThDMwwwwwMDhTSO",  // 25  mizzen mast
+  "OSNhTDDDDDDDThNSO",  // 26  stern castle
+  ".ONhTDDDDDDDThNO.",  // 27
+  "..ONhDDDDDDDhNO..",  // 28
+  "...ONhDDDDDhNO...",  // 29
+  "....ONhDDDhNO....",  // 30
+  ".....ODdDdDO.....",  // 31  stern tip = 5+7+5 = 17 ✓
+  "OkCkCkKKKCKCKkKKO",  // 32  hull-side 4 ports = 17 ✓
+  "OkkkkkkkKKKKKKKKO",  // 33
+  ".OkkkkkKKKKKKKKO.",  // 34
+  ".OOOOOOOOOOOOOOO.",  // 35  waterline
+];
+
+const SHIP_GRIDS = [
+  SHIP_GRID_0, SHIP_GRID_1, SHIP_GRID_2, SHIP_GRID_3, SHIP_GRID_4,
+  SHIP_GRID_5, SHIP_GRID_6, SHIP_GRID_7, SHIP_GRID_8, SHIP_GRID_9,
+];
+function getGrid(model) { return SHIP_GRIDS[clamp(model, 0, 9)]; }
 function gridHalfW(grid) { return grid[0].length * SHIP_CELL / 2; }
 function gridHalfH(grid) { return grid.length * SHIP_CELL / 2; }
 
@@ -183,6 +445,11 @@ function shipColorFor(s) {
   const P_c = shade(s.flag,  24);
   const p_c = shade(s.flag, -30);
   const R_c = "#ffcc18";
+  const K_c = shade(s.hue,    6);
+  const k_c = shade(s.hue,  -32);
+  const C_c = "#040108";
+  const F_c = shade(s.flag,  32);
+  const f_c = shade(s.flag, -16);
   return (ch) => {
     switch (ch) {
       case "O": return O_c;
@@ -201,6 +468,11 @@ function shipColorFor(s) {
       case "P": return P_c;
       case "p": return p_c;
       case "R": return R_c;
+      case "K": return K_c;
+      case "k": return k_c;
+      case "C": return C_c;
+      case "F": return F_c;
+      case "f": return f_c;
       default: return null;
     }
   };
@@ -210,7 +482,9 @@ let _sid = 0;
 function makeShip(side, level = 1, model = -1) {
   const player = side === "player";
   const boss = side === "boss";
-  const assignedModel = model >= 0 ? model : (player ? 3 : boss ? 6 : Math.floor(rand(0, 6)));
+  const enemyBucket = level <= 1 ? [0,1] : level <= 3 ? [1,2,3] : level <= 5 ? [2,3,4,5] : [5,6,7,8];
+  const enemyModel = enemyBucket[Math.floor(rand(0, enemyBucket.length))];
+  const assignedModel = model >= 0 ? model : (player ? 6 : boss ? 9 : enemyModel);
   const maxHp = player ? 100 : boss ? 300 : 80 + level * 5;
   return {
     id: ++_sid,
@@ -975,7 +1249,7 @@ function PixelShipBroadsideGame() {
           const distToPlayer = Math.sqrt(dist2(p.x, p.y, e.x, e.y));
           if (e.gazeCD <= 0 && distToPlayer < 340) {
             e.gazeCD = 5000;
-            p.gazeTimer = 200;
+            p.gazeTimer = 4000;
             g.shake = Math.max(g.shake, 2.0);
             const ang = Math.atan2(p.y - e.y, p.x - e.x);
             for (let n = 0; n < 14; n++) {
