@@ -485,11 +485,12 @@ function makeShip(side, level = 1, model = -1) {
   const enemyBucket = level <= 1 ? [0,1] : level <= 3 ? [1,2,3] : level <= 5 ? [2,3,4,5] : [5,6,7,8];
   const enemyModel = enemyBucket[Math.floor(rand(0, enemyBucket.length))];
   const assignedModel = model >= 0 ? model : (player ? 6 : boss ? 9 : enemyModel);
-  const maxHp = player ? 100 : boss ? 300 : 80 + level * 5;
+  const maxHp = player ? 100 : boss ? 450 : 130 + level * 20;
   return {
     id: ++_sid,
     side,
     model: assignedModel,
+    level,
     x: 0,
     y: 0,
     angle: player ? 0 : Math.PI,
@@ -499,12 +500,14 @@ function makeShip(side, level = 1, model = -1) {
     speed: 0.06,
     vx: 0,
     vy: 0,
-    maxSpeed: player ? 0.13 : boss ? 0.07 : 0.105 + level * 0.003,
+    maxSpeed: player ? 0.13 : boss ? 0.10 : 0.118 + level * 0.005,
     health: maxHp,
     maxHealth: maxHp,
     armor: boss ? 6 : 0,
-    reload: rand(0.2, 1.6),
+    dmgBonus: player ? 0 : boss ? 8 : Math.floor(level * 1.5),
+    reload: rand(0.3, 0.9),
     flash: 0,
+    hitFlash: 0,
     recoil: 0,
     bob: rand(0, PI2),
     sail: rand(0, PI2),
@@ -526,6 +529,7 @@ function makeParticles() {
     splashes: [],
     embers: [],
     ripples: [],
+    explosions: [],
   };
 }
 
@@ -537,19 +541,21 @@ const UPGRADES = [
 ];
 
 function spawnEnemies(level, totalKills, player) {
-  if (totalKills >= 3) {
+  if (totalKills >= 8) {
     const boss = makeShip("boss", level);
-    boss.x = clamp(player.x + 450 + rand(-60, 60), 150, WORLD_W - 150);
-    boss.y = clamp(player.y + rand(-120, 120), 150, WORLD_H - 150);
+    const bossAng = rand(0, PI2);
+    boss.x = clamp(player.x + Math.cos(bossAng) * 700, 150, WORLD_W - 150);
+    boss.y = clamp(player.y + Math.sin(bossAng) * 700, 150, WORLD_H - 150);
     return [boss];
   }
-  const count = Math.min(1 + Math.floor(level / 2), 4);
+  const count = Math.min(2 + Math.floor(level / 2), 6);
   const enemies = [];
   for (let i = 0; i < count; i++) {
     const e = makeShip("enemy", level);
-    const ang = (i / count) * PI2 + rand(-0.3, 0.3);
-    e.x = clamp(player.x + Math.cos(ang) * (380 + i * 70), 120, WORLD_W - 120);
-    e.y = clamp(player.y + Math.sin(ang) * (380 + i * 70), 120, WORLD_H - 120);
+    const ang = (i / count) * PI2 + rand(-0.2, 0.2);
+    const dist = 650 + i * 80;
+    e.x = clamp(player.x + Math.cos(ang) * dist, 120, WORLD_W - 120);
+    e.y = clamp(player.y + Math.sin(ang) * dist, 120, WORLD_H - 120);
     enemies.push(e);
   }
   return enemies;
@@ -979,9 +985,13 @@ function PixelShipBroadsideGame() {
       const x = toScreenX(p.x);
       const y = toScreenY(p.y);
       ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${a * 0.48})`;
-      ctx.fillRect(Math.round(x - s), Math.round(y - s), Math.round(s * 2), Math.round(s * 2));
-      ctx.fillStyle = `rgba(255,255,255,${a * 0.18})`;
-      ctx.fillRect(Math.round(x - s + 1), Math.round(y - s + 1), Math.max(1, Math.round(s * 2 - 2)), Math.max(1, Math.round(s * 2 - 2)));
+      ctx.beginPath();
+      ctx.arc(x, y, s, 0, PI2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(255,255,255,${a * 0.14})`;
+      ctx.beginPath();
+      ctx.arc(x - s * 0.2, y - s * 0.2, s * 0.55, 0, PI2);
+      ctx.fill();
     };
 
     const drawSpark = (p) => {
@@ -994,10 +1004,23 @@ function PixelShipBroadsideGame() {
       const a = clamp(p.life / p.maxLife, 0, 1);
       const x = toScreenX(p.x);
       const y = toScreenY(p.y);
-      ctx.fillStyle = `rgba(150,220,255,${a})`;
-      ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
-      ctx.fillStyle = `rgba(255,255,255,${a * 0.65})`;
-      ctx.fillRect(Math.round(x + p.vx * 0.18), Math.round(y + p.vy * 0.18), 1, 1);
+      ctx.fillStyle = `rgba(150,220,255,${a * 0.9})`;
+      ctx.fillRect(Math.round(x) - 2, Math.round(y) - 2, 4, 4);
+      ctx.fillStyle = `rgba(220,240,255,${a * 0.45})`;
+      ctx.fillRect(Math.round(x) - 5, Math.round(y) - 5, 10, 10);
+    };
+
+    const drawExplosion = (p) => {
+      const a = clamp(p.life, 0, 1);
+      const radius = p.r * (1 + (1 - a) * 2.2);
+      const sx = toScreenX(p.x);
+      const sy = toScreenY(p.y);
+      ctx.globalAlpha = a * 0.85;
+      ctx.fillStyle = a > 0.55 ? "#ff8800" : "#aa3311";
+      ctx.beginPath();
+      ctx.arc(sx, sy, radius, 0, PI2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
     };
 
     const drawShot = (p) => {
@@ -1045,6 +1068,11 @@ function PixelShipBroadsideGame() {
 
       drawSpriteGrid(ctx, grid, -hW, -hH, SHIP_CELL, shipColorFor(s));
 
+      if (s.hitFlash > 0) {
+        ctx.fillStyle = `rgba(255,60,60,${s.hitFlash * 0.65})`;
+        ctx.fillRect(-hW, -hH, hW * 2, hH * 2);
+      }
+
       if (s.flash > 0) {
         const side = s.flashSide || 1;
         ctx.fillStyle = "rgba(255,248,196,0.9)";
@@ -1064,6 +1092,16 @@ function PixelShipBroadsideGame() {
       if (s.health < s.maxHealth * 0.15) {
         ctx.fillStyle = "rgba(70,30,20,0.5)";
         ctx.fillRect(-2, 8, 4, 6);
+      }
+
+      if (!s.player) {
+        const barW = hW * 2;
+        const barX = -hW;
+        const barY = -hH - 7;
+        ctx.fillStyle = "#220000";
+        ctx.fillRect(barX, barY, barW, 4);
+        ctx.fillStyle = s.side === "boss" ? "#ff44aa" : "#ff2222";
+        ctx.fillRect(barX, barY, Math.round(barW * Math.max(0, s.health) / s.maxHealth), 4);
       }
       ctx.restore();
     };
@@ -1111,7 +1149,7 @@ function PixelShipBroadsideGame() {
       const lateral = gridHalfW(getGrid(shooter.model)) + 4;
       const isBoss = shooter.side === "boss";
       const muzzleOffsets = isBoss ? [-18, -9, 0, 9, 18] : [-11, -3, 5, 13];
-      const dmgBonus = shooter.side === "player" ? g.upgrades.damage * 4 : 0;
+      const dmgBonus = shooter.side === "player" ? g.upgrades.damage * 4 : (shooter.dmgBonus || 0);
       muzzleOffsets.forEach((off, i) => {
         const ang = shooter.angle + broadside * Math.PI / 2 + (i - (muzzleOffsets.length - 1) / 2) * 0.03;
         const spd = 3.55 + rand(-0.12, 0.16);
@@ -1225,7 +1263,7 @@ function PixelShipBroadsideGame() {
         for (const other of g.enemies) {
           if (other === e || other.health <= 0) continue;
           const d = Math.sqrt(dist2(other.x, other.y, e.x, e.y));
-          if (d < tgtDist * 0.6) { tgt = other; tgtDist = d; }
+          if (d < tgtDist * 0.3) { tgt = other; tgtDist = d; }
         }
 
         const closingTime = clamp(tgtDist / Math.max(0.04, e.maxSpeed), 0, 900);
@@ -1264,7 +1302,8 @@ function PixelShipBroadsideGame() {
         // Enemy fires at its target
         const bearingFromEnemy = normalizeAngle(Math.atan2(tgt.y - e.y, tgt.x - e.x) - e.angle);
         const enemyArcSide = Math.abs(Math.abs(bearingFromEnemy) - Math.PI / 2) < ARC_HALF ? sign(bearingFromEnemy) : 0;
-        if (e.reload <= 0 && enemyArcSide !== 0 && tgtDist < FIRE_RANGE) {
+        const enemyFireRange = clamp(300 + (e.level || 1) * 20, 340, 500);
+        if (e.reload <= 0 && enemyArcSide !== 0 && tgtDist < enemyFireRange) {
           fireBroadside(e, enemyArcSide);
         }
       }
@@ -1320,8 +1359,10 @@ function PixelShipBroadsideGame() {
           if (s.wakeTrail.length > 50) s.wakeTrail.shift();
         }
 
-        s.reload = Math.max(0, s.reload - dt * 0.0015);
+        const reloadRate = s.side !== "player" ? 0.0015 * (1 + (s.level || 1) * 0.1) : 0.0015;
+        s.reload = Math.max(0, s.reload - dt * reloadRate);
         s.flash = Math.max(0, s.flash - dt * 0.02);
+        s.hitFlash = Math.max(0, (s.hitFlash || 0) - dt * 0.005);
         s.recoil = Math.max(0, s.recoil - dt * 0.02);
         s.bob += dt * 0.001;
         s.sail += dt * 0.0016;
@@ -1341,7 +1382,7 @@ function PixelShipBroadsideGame() {
         b.y = clamp(b.y, 40, WORLD_H - 40);
         if (dist2(b.x, b.y, p.x, p.y) < 650) {
           b.alive = false;
-          p.health = clamp(p.health + 15, 0, p.maxHealth);
+          p.health = clamp(p.health + 8, 0, p.maxHealth);
           g.gold += b.gold;
           g.score += 35;
           for (let n = 0; n < 6; n++) g.particles.ripples.push({ x: b.x, y: b.y, vx: rand(-0.12, 0.12), vy: rand(-0.12, 0.12), life: 18, maxLife: 18, size: rand(3, 7), r: 255, g: 255, b: 255 });
@@ -1380,13 +1421,21 @@ function PixelShipBroadsideGame() {
             const rawDmg = 8 + rand(0, 7) + (b.dmgBonus || 0);
             const dmg = Math.max(1, rawDmg - s.armor);
             s.health -= dmg;
+            s.hitFlash = 1.0;
             const isPlayerHit = s === p;
             const isPlayerShot = b.owner === p.id;
             if (isPlayerShot) g.score += 18;
             g.shake = Math.max(g.shake, isPlayerHit ? 3.5 : 3.0);
             for (let n = 0; n < 12; n++) g.particles.smoke.push({ x: b.x, y: b.y, vx: rand(-0.24, 0.24), vy: rand(-0.2, 0.08), life: 30, maxLife: 30, size: rand(2, 5), r: 85, g: 85, b: 92 });
             for (let n = 0; n < 14; n++) g.particles.sparks.push({ x: b.x, y: b.y, vx: rand(-0.58, 0.58), vy: rand(-0.48, 0.22), life: 16, maxLife: 16, r: 255, g: rand(140, 220), b: rand(65, 120) });
-            for (let n = 0; n < 9; n++) g.particles.splashes.push({ x: b.x, y: b.y, vx: rand(-0.48, 0.48), vy: rand(-0.62, -0.15), life: 18, maxLife: 18, size: rand(1, 2), r: 140, g: 210, b: 255 });
+            for (let n = 0; n < 9; n++) g.particles.splashes.push({ x: b.x, y: b.y, vx: rand(-0.48, 0.48), vy: rand(-0.62, -0.15), life: 18, maxLife: 18, size: rand(2, 4), r: 140, g: 210, b: 255 });
+            if (s.health <= 0) {
+              for (let n = 0; n < 18; n++) {
+                const ea = rand(0, PI2);
+                const espd = rand(0.05, 0.28);
+                g.particles.explosions.push({ x: s.x, y: s.y, vx: Math.cos(ea) * espd, vy: Math.sin(ea) * espd, life: 1, maxLife: 1, r: rand(10, 22) });
+              }
+            }
             g.shots.splice(i, 1);
             if (navigator.vibrate) navigator.vibrate(20);
             hit = true;
@@ -1412,6 +1461,15 @@ function PixelShipBroadsideGame() {
       updateParticles(g.particles.splashes, 0.05, 1.1);
       updateParticles(g.particles.embers, 0.04, 1.2);
       updateParticles(g.particles.ripples, 0.02, 1.0);
+      for (let i = g.particles.explosions.length - 1; i >= 0; i--) {
+        const ep = g.particles.explosions[i];
+        ep.x += ep.vx * dt;
+        ep.y += ep.vy * dt;
+        ep.vx *= 0.96;
+        ep.vy *= 0.96;
+        ep.life -= dt / 800;
+        if (ep.life <= 0) g.particles.explosions.splice(i, 1);
+      }
 
       // Check enemy kills
       for (const e of g.enemies) {
@@ -1573,6 +1631,7 @@ function PixelShipBroadsideGame() {
       g.enemies.forEach(e => drawShip(e, t));
 
       g.shots.forEach(drawShot);
+      g.particles.explosions.forEach(drawExplosion);
       g.particles.smoke.forEach(drawSmoke);
       g.particles.sparks.forEach(drawSpark);
       g.particles.splashes.forEach(drawSplash);
