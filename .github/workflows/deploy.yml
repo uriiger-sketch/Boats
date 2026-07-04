@@ -2,7 +2,10 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: ["main", "claude/pixel-ship-game-iphone-b14mal"]
+    branches:
+      - main
+      - claude/pixel-ship-game-iphone-b14mal
+      - claude/ship-game-improvements-0l7gu0
   workflow_dispatch:
 
 permissions:
