@@ -1094,7 +1094,7 @@ function PixelShipBroadsideGame() {
         ctx.fillRect(-2, 8, 4, 6);
       }
 
-      if (!s.player) {
+      if (s.side !== "player") {
         const barW = hW * 2;
         const barX = -hW;
         const barY = -hH - 7;
