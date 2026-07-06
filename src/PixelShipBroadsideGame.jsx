@@ -366,44 +366,44 @@ const SHIP_GRID_8 = [
   ".OOOOOOOOOOOOOOOOO.",  // 37  waterline = 19 ✓
 ];
 
-// Model 9 – Medusa boss  (17 × 36)  tri-serpent bow, green accents, dark hull
+// Model 9 – Leviathan boss  (17 × 36)  top-down sea serpent, no sails, scale body
 const SHIP_GRID_9 = [
-  "........P........",  // 0  center serpent tip
-  ".......PpP.......",  // 1
-  "......PpRpP......",  // 2  tri-head (extra P flanks)
-  ".....PpODOpP.....",  // 3  three snake necks
-  "....ONhDhDhNO....",  // 4
-  "...ONhTDDDThNO...",  // 5
-  "..ONhTDDDDDThNO..",  // 6
-  ".ONhTDDDDDDDThNO.",  // 7
-  "OSNhTDDDDDDDThNSO",  // 8
-  "OSThdDdDdDdDdhTSO",  // 9
-  "OBThDlDlDlDlDhTBO",  // 10
-  "OSThdDdDdDdDdhTSO",  // 11
-  "OSThdDdDdDdDdhTSO",  // 12  serpent body scales
-  "OBThDSDWWWSDhTBO.",  // 13  fore sail bright (serpent shields) = 17 ✓
-  "OSThdMWWWWWMdhTSO",  // 14  fore mast = 17 ✓
-  "OBThDSDWWWSDhTBO.",  // 15  fore sail
-  "OSThdDdDdDdDdhTSO",  // 16
-  "OSThdDdDdDdDdhTSO",  // 17
-  "OBThDlDlDlDlDhTBO",  // 18
-  "OSThdWWWWWWWdhTSO",  // 19  main sail bright
-  "OBThMWWWWWWWMhTBO",  // 20  main mast
-  "OSThdWWWWWWWdhTSO",  // 21
-  "OBThDlDlDlDlDhTBO",  // 22
-  "OSThdDdDdDdDdhTSO",  // 23
-  "OBThDWWWWWWWDhTBO",  // 24  mizzen sail bright
-  "OSThDMWWWWWMDhTSO",  // 25  mizzen mast = 17 ✓
-  "OSNhTDDDDDDDThNSO",  // 26  stern castle
-  ".ONhTDDDDDDDThNO.",  // 27
-  "..ONhDDDDDDDhNO..",  // 28
-  "...ONhDDDDDhNO...",  // 29
-  "....ONhDDDhNO....",  // 30
-  ".....ODdDdDO.....",  // 31  stern tip = 17 ✓
-  "OhhhhhhhhhhhhhhhO",  // 32  hull top rail = 17 ✓
-  "OkCkCkKKCKKKCKKKO",  // 33  cannon ports = 17 ✓
-  "OkkkkkKKKKKKKKKKO",  // 34  hull planks = 17 ✓
-  ".OOOOOOOOOOOOOOO.",  // 35  waterline
+  "........P........",  // 0   head tip (P = bright flag-based)
+  ".......PpP.......",  // 1   snout
+  "......OpRpO......",  // 2   eye ring (R = gold eye)
+  ".....ONhfhNO.....",  // 3   jaw (f = dark green)
+  "....ONhRSRhNO....",  // 4   two gold eyes, green center scale
+  "...ONhTDfDThNO...",  // 5   neck
+  "..ONhTDSfSDThNO..",  // 6   green scales appear
+  ".ONhTDSfDfSDThNO.",  // 7   15-wide body
+  "OSNhTDSDfDSDThNSO",  // 8   full-width — scale pattern A
+  "OBNhTDfDSDfDThNBO",  // 9   scale pattern B
+  "OSNhTDSDfDSDThNSO",  // 10  scale A
+  "OBNhTDfDSDfDThNBO",  // 11  scale B
+  "OSNhTDGDSDGDThNSO",  // 12  gold belly accent
+  "OSThdDdDdDdDdhTSO",  // 13  smooth body row
+  "OSNhTDSDfDSDThNSO",  // 14  scale A
+  "OBNhTDfDSDfDThNBO",  // 15  scale B
+  "OSNhTDSDfDSDThNSO",  // 16  scale A
+  "OSThdDdDdDdDdhTSO",  // 17  smooth
+  "OSNhTDGDSDGDThNSO",  // 18  gold belly accent
+  "OBNhTDfDSDfDThNBO",  // 19  scale B
+  "OSNhTDSDfDSDThNSO",  // 20  scale A
+  "OBNhTDfDSDfDThNBO",  // 21  scale B
+  "OSThdDdDdDdDdhTSO",  // 22  smooth
+  "OSNhTDSDfDSDThNSO",  // 23  scale A
+  "OBNhTDfDSDfDThNBO",  // 24  scale B
+  "OSNhTDGDSDGDThNSO",  // 25  gold belly accent
+  "OSThdDdDdDdDdhTSO",  // 26  smooth
+  "OSNhTDSDfDSDThNSO",  // 27  scale A — body ending
+  ".ONhTDSfDfSDThNO.",  // 28  15-wide taper
+  "..ONhTDSfSDThNO..",  // 29  13-wide
+  "...ONhTDfDThNO...",  // 30  11-wide
+  "....ONhfDfhNO....",  // 31   9-wide
+  ".....ONhDhNO.....",  // 32   7-wide
+  "......ONhNO......",  // 33   5-wide
+  ".......OhO.......",  // 34   3-wide
+  "........O........",  // 35  tail tip
 ];
 
 const SHIP_GRIDS = [
@@ -485,7 +485,7 @@ function makeShip(side, level = 1, model = -1) {
   const enemyBucket = level <= 1 ? [0,1] : level <= 3 ? [1,2,3] : level <= 5 ? [2,3,4,5] : [5,6,7,8];
   const enemyModel = enemyBucket[Math.floor(rand(0, enemyBucket.length))];
   const assignedModel = model >= 0 ? model : (player ? 6 : boss ? 9 : enemyModel);
-  const maxHp = player ? 100 : boss ? 450 : 130 + level * 20;
+  const maxHp = player ? 150 : boss ? 675 : 195 + level * 30;
   return {
     id: ++_sid,
     side,
@@ -509,6 +509,7 @@ function makeShip(side, level = 1, model = -1) {
     flash: 0,
     hitFlash: 0,
     recoil: 0,
+    turnMult: 1,
     bob: rand(0, PI2),
     sail: rand(0, PI2),
     sinking: 0,
@@ -534,10 +535,15 @@ function makeParticles() {
 }
 
 const UPGRADES = [
-  { name: "Hull Plating", desc: "+25 max hull", cost: 4, maxLv: 3, key: "hull" },
-  { name: "Fast Rigging", desc: "+12% speed", cost: 4, maxLv: 3, key: "speed" },
-  { name: "Gunpowder", desc: "-15% reload", cost: 5, maxLv: 3, key: "reload" },
-  { name: "Iron Balls", desc: "+4 dmg/ball", cost: 6, maxLv: 2, key: "damage" },
+  { name: "Hull Plating",   desc: "+25 max hull",       cost: 4, maxLv: 3, key: "hull" },
+  { name: "Fast Rigging",   desc: "+12% speed",          cost: 4, maxLv: 3, key: "speed" },
+  { name: "Gunpowder",      desc: "-15% reload time",    cost: 5, maxLv: 3, key: "reload" },
+  { name: "Iron Balls",     desc: "+4 dmg/ball",         cost: 6, maxLv: 2, key: "damage" },
+  { name: "Crow's Nest",    desc: "+18% fire arc",       cost: 5, maxLv: 2, key: "arc" },
+  { name: "Double Shot",    desc: "+1 ball per side",    cost: 7, maxLv: 1, key: "multishot" },
+  { name: "Copper Bottom",  desc: "+20% turn rate",      cost: 4, maxLv: 2, key: "turn" },
+  { name: "Ship's Surgeon", desc: "+1 hull/sec regen",   cost: 6, maxLv: 2, key: "regen" },
+  { name: "Chain Shot",     desc: "+15% cannon range",   cost: 5, maxLv: 3, key: "range" },
 ];
 
 function spawnEnemies(level, totalKills, player) {
@@ -566,16 +572,17 @@ function makeGame(prev = null) {
   const totalKills = prev ? prev.totalKills : 0;
   const gold = prev ? prev.gold : 0;
   const score = prev ? prev.score : 0;
-  const upgrades = prev ? prev.upgrades : { hull: 0, speed: 0, reload: 0, damage: 0 };
+  const upgrades = prev ? prev.upgrades : { hull: 0, speed: 0, reload: 0, damage: 0, arc: 0, multishot: 0, turn: 0, regen: 0, range: 0 };
 
   const player = (prev && prev.player) ? prev.player : makeShip("player", 1);
   if (!prev) {
     player.x = WORLD_W / 2 - 260;
     player.y = WORLD_H / 2;
   }
-  player.maxHealth = 100 + upgrades.hull * 25;
+  player.maxHealth = 150 + upgrades.hull * 25;
   if (!prev) player.health = player.maxHealth;
   player.maxSpeed = 0.13 * (1 + upgrades.speed * 0.12);
+  player.turnMult = 1 + upgrades.turn * 0.20;
 
   const enemies = spawnEnemies(level, totalKills, player);
 
@@ -807,35 +814,44 @@ function PixelShipBroadsideGame() {
 
       // Shop interaction
       if (g.phase === "shop") {
-        const cardW = 185, cardH = 210, gap = 16;
-        const totalW = 4 * cardW + 3 * gap;
-        const startX = Math.round((W - totalW) / 2);
-        const cardY = 118;
+        const cardW = 160, cardH = 115, gap = 10;
+        const row1Count = 5, row2Count = UPGRADES.length - row1Count;
+        const totalW1 = row1Count * cardW + (row1Count - 1) * gap;
+        const totalW2 = row2Count * cardW + (row2Count - 1) * gap;
+        const startX1 = Math.round((W - totalW1) / 2);
+        const startX2 = Math.round((W - totalW2) / 2);
+        const cardY1 = 118, cardY2 = cardY1 + cardH + 12;
 
         // Check upgrade buy buttons
         UPGRADES.forEach((upg, i) => {
-          const cx2 = startX + i * (cardW + gap);
-          const lv = g.upgrades[upg.key];
+          const row = i < row1Count ? 0 : 1;
+          const col = i < row1Count ? i : i - row1Count;
+          const cx2 = (row === 0 ? startX1 : startX2) + col * (cardW + gap);
+          const cy2 = row === 0 ? cardY1 : cardY2;
+          const lv = g.upgrades[upg.key] || 0;
           const canAfford = g.gold >= upg.cost;
           if (!canAfford || lv >= upg.maxLv) return;
-          // Buy button region: cx2+20 .. cx2+cardW-20, cardY+128 .. cardY+162
-          if (x >= cx2 + 20 && x <= cx2 + cardW - 20 && y >= cardY + 128 && y <= cardY + 162) {
-            g.upgrades[upg.key] += 1;
+          // Buy button region: cx2+12 .. cx2+cardW-12, cy2+86 .. cy2+110
+          if (x >= cx2 + 12 && x <= cx2 + cardW - 12 && y >= cy2 + 86 && y <= cy2 + 110) {
+            g.upgrades[upg.key] = (g.upgrades[upg.key] || 0) + 1;
             g.gold -= upg.cost;
-            // Apply hull upgrade to player immediately
             if (upg.key === "hull") {
-              g.player.maxHealth = 100 + g.upgrades.hull * 25;
+              g.player.maxHealth = 150 + g.upgrades.hull * 25;
               g.player.health = Math.min(g.player.health + 25, g.player.maxHealth);
             }
             if (upg.key === "speed") {
               g.player.maxSpeed = 0.13 * (1 + g.upgrades.speed * 0.12);
             }
+            if (upg.key === "turn") {
+              g.player.turnMult = 1 + g.upgrades.turn * 0.20;
+            }
             setUi(s => ({ ...s, gold: g.gold }));
           }
         });
 
-        // Set Sail button
-        const sailX = W / 2 - 100, sailY = 370, sailW = 200, sailH = 46;
+        // Set Sail button — must match drawShop sailY
+        const cardH_s = 115, cardY1_s = 102, cardY2_s = cardY1_s + cardH_s + 12;
+        const sailX = W / 2 - 90, sailY = cardY2_s + cardH_s + 16, sailW = 180, sailH = 40;
         if (x >= sailX && x <= sailX + sailW && y >= sailY && y <= sailY + sailH) {
           // Advance to next battle
           const next = makeGame(g);
@@ -1148,7 +1164,9 @@ function PixelShipBroadsideGame() {
       const rightY = Math.cos(shooter.angle);
       const lateral = gridHalfW(getGrid(shooter.model)) + 4;
       const isBoss = shooter.side === "boss";
-      const muzzleOffsets = isBoss ? [-18, -9, 0, 9, 18] : [-11, -3, 5, 13];
+      const playerMultishot = shooter.side === "player" && g.upgrades.multishot > 0;
+      const muzzleOffsets = isBoss ? [-18, -9, 0, 9, 18] :
+        playerMultishot ? [-14, -7, 0, 7, 14] : [-11, -3, 5, 13];
       const dmgBonus = shooter.side === "player" ? g.upgrades.damage * 4 : (shooter.dmgBonus || 0);
       muzzleOffsets.forEach((off, i) => {
         const ang = shooter.angle + broadside * Math.PI / 2 + (i - (muzzleOffsets.length - 1) / 2) * 0.03;
@@ -1188,7 +1206,7 @@ function PixelShipBroadsideGame() {
       s.rudderTarget = clamp(steerInput, -1, 1);
       s.rudder = lerp(s.rudder, s.rudderTarget, clamp(RUDDER_RATE * dt, 0, 1));
 
-      const angularAccel = s.rudder * MAX_ANGULAR_ACC * speedFactor(s);
+      const angularAccel = s.rudder * (s.turnMult || 1) * MAX_ANGULAR_ACC * speedFactor(s);
       s.angularVel += angularAccel * dt;
       s.angularVel *= Math.max(0, 1 - ANGULAR_DRAG * dt);
       s.angle += s.angularVel * dt;
@@ -1250,8 +1268,14 @@ function PixelShipBroadsideGame() {
 
       integrateShip(p, steerInput, thrustInput, dt);
 
+      if (g.upgrades.regen > 0) {
+        p.health = Math.min(p.maxHealth, p.health + g.upgrades.regen * 0.001 * dt);
+      }
+
       const ARC_HALF = 0.5;
       const FIRE_RANGE = 340;
+      const playerArcHalf = ARC_HALF * (1 + g.upgrades.arc * 0.18);
+      const playerFireRange = FIRE_RANGE * (1 + g.upgrades.range * 0.15);
 
       // AI for each enemy: target player or nearest other alive ship
       for (const e of g.enemies) {
@@ -1320,9 +1344,9 @@ function PixelShipBroadsideGame() {
           if (e.health <= 0) continue;
           const dx = e.x - p.x, dy = e.y - p.y;
           const d = Math.sqrt(dx * dx + dy * dy);
-          if (d > FIRE_RANGE) continue;
+          if (d > playerFireRange) continue;
           const bearing = normalizeAngle(Math.atan2(e.y - p.y, e.x - p.x) - p.angle);
-          const arcSide = Math.abs(Math.abs(bearing) - Math.PI / 2) < ARC_HALF ? sign(bearing) : 0;
+          const arcSide = Math.abs(Math.abs(bearing) - Math.PI / 2) < playerArcHalf ? sign(bearing) : 0;
           if (fireHeld && p.reload <= 0 && !g.over && arcSide !== 0) {
             fireBroadside(p, arcSide);
             g.score += 1;
@@ -1657,71 +1681,78 @@ function PixelShipBroadsideGame() {
       ctx.fillRect(0, 0, W, H);
 
       ctx.fillStyle = "#c09028";
-      ctx.font = "bold 28px sans-serif";
+      ctx.font = "bold 26px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("⚓ UPGRADE SHOP", W / 2, 70);
+      ctx.fillText("UPGRADE SHOP", W / 2, 62);
 
       ctx.fillStyle = "rgba(255,255,255,0.65)";
-      ctx.font = "15px sans-serif";
-      ctx.fillText(`Gold: ${Math.floor(g.gold)}  ·  Level ${g.level}`, W / 2, 98);
+      ctx.font = "14px sans-serif";
+      ctx.fillText(`Gold: ${Math.floor(g.gold)}  ·  Level ${g.level}`, W / 2, 88);
 
-      const cardW = 185, cardH = 210, gap = 16;
-      const totalW = 4 * cardW + 3 * gap;
-      const startX = Math.round((W - totalW) / 2);
-      const cardY = 118;
+      const cardW = 160, cardH = 115, gap = 10;
+      const row1Count = 5, row2Count = UPGRADES.length - row1Count;
+      const totalW1 = row1Count * cardW + (row1Count - 1) * gap;
+      const totalW2 = row2Count * cardW + (row2Count - 1) * gap;
+      const startX1 = Math.round((W - totalW1) / 2);
+      const startX2 = Math.round((W - totalW2) / 2);
+      const cardY1 = 102, cardY2 = cardY1 + cardH + 12;
 
       UPGRADES.forEach((upg, i) => {
-        const cx2 = startX + i * (cardW + gap);
-        const lv = g.upgrades[upg.key];
+        const row = i < row1Count ? 0 : 1;
+        const col = i < row1Count ? i : i - row1Count;
+        const cx2 = (row === 0 ? startX1 : startX2) + col * (cardW + gap);
+        const cy2 = row === 0 ? cardY1 : cardY2;
+        const lv = g.upgrades[upg.key] || 0;
         const maxed = lv >= upg.maxLv;
         const canAfford = g.gold >= upg.cost;
-        const bgCol = maxed ? "rgba(40,60,40,0.7)" : canAfford ? "rgba(30,50,80,0.75)" : "rgba(40,20,20,0.65)";
+        const bgCol = maxed ? "rgba(40,60,40,0.72)" : canAfford ? "rgba(28,48,82,0.78)" : "rgba(40,20,20,0.68)";
         ctx.fillStyle = bgCol;
-        ctx.fillRect(cx2, cardY, cardW, cardH);
-        ctx.strokeStyle = maxed ? "#4aaa44" : canAfford ? "rgba(180,200,255,0.5)" : "rgba(120,80,80,0.5)";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(cx2, cardY, cardW, cardH);
+        ctx.fillRect(cx2, cy2, cardW, cardH);
+        ctx.strokeStyle = maxed ? "#4aaa44" : canAfford ? "rgba(160,190,255,0.55)" : "rgba(110,70,70,0.55)";
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(cx2, cy2, cardW, cardH);
 
         ctx.fillStyle = maxed ? "#88ff88" : "white";
-        ctx.font = "bold 14px sans-serif";
+        ctx.font = "bold 12px sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText(upg.name, cx2 + cardW / 2, cardY + 30);
+        ctx.fillText(upg.name, cx2 + cardW / 2, cy2 + 18);
 
-        ctx.fillStyle = "rgba(200,220,255,0.85)";
-        ctx.font = "12px sans-serif";
-        ctx.fillText(upg.desc, cx2 + cardW / 2, cardY + 58);
+        ctx.fillStyle = "rgba(190,215,255,0.85)";
+        ctx.font = "11px sans-serif";
+        ctx.fillText(upg.desc, cx2 + cardW / 2, cy2 + 36);
 
         // Level pips
+        const pipW = Math.min(18, Math.floor((cardW - 20) / upg.maxLv) - 4);
         for (let pip = 0; pip < upg.maxLv; pip++) {
-          ctx.fillStyle = pip < lv ? "#c09028" : "rgba(255,255,255,0.2)";
-          ctx.fillRect(cx2 + 16 + pip * 22, cardY + 76, 16, 8);
+          ctx.fillStyle = pip < lv ? "#c09028" : "rgba(255,255,255,0.18)";
+          ctx.fillRect(cx2 + 10 + pip * (pipW + 4), cy2 + 48, pipW, 6);
         }
 
         if (!maxed) {
-          ctx.fillStyle = canAfford ? "rgba(255,220,80,0.95)" : "rgba(180,100,100,0.8)";
-          ctx.font = "bold 13px sans-serif";
-          ctx.fillText(`Cost: ${upg.cost}g`, cx2 + cardW / 2, cardY + 110);
+          ctx.fillStyle = canAfford ? "rgba(255,215,70,0.95)" : "rgba(175,95,95,0.85)";
+          ctx.font = "bold 11px sans-serif";
+          ctx.fillText(`Cost: ${upg.cost}g`, cx2 + cardW / 2, cy2 + 72);
           if (canAfford) {
-            ctx.fillStyle = "rgba(80,160,255,0.9)";
-            ctx.fillRect(cx2 + 20, cardY + 128, cardW - 40, 34);
+            ctx.fillStyle = "rgba(65,145,245,0.92)";
+            ctx.fillRect(cx2 + 12, cy2 + 86, cardW - 24, 22);
             ctx.fillStyle = "white";
-            ctx.font = "bold 13px sans-serif";
-            ctx.fillText("BUY", cx2 + cardW / 2, cardY + 150);
+            ctx.font = "bold 11px sans-serif";
+            ctx.fillText("BUY", cx2 + cardW / 2, cy2 + 101);
           }
         } else {
           ctx.fillStyle = "#88ff88";
-          ctx.font = "bold 13px sans-serif";
-          ctx.fillText("MAXED", cx2 + cardW / 2, cardY + 120);
+          ctx.font = "bold 11px sans-serif";
+          ctx.fillText("MAXED", cx2 + cardW / 2, cy2 + 88);
         }
       });
 
       // Set Sail button
-      const sailX = W / 2 - 100, sailY = 370, sailW = 200, sailH = 46;
+      const sailX = W / 2 - 90, sailY = cardY2 + cardH + 16, sailW = 180, sailH = 40;
       ctx.fillStyle = "rgba(220,180,40,0.92)";
       ctx.fillRect(sailX, sailY, sailW, sailH);
       ctx.fillStyle = "#0a0a12";
-      ctx.font = "bold 18px sans-serif";
-      ctx.fillText("Set Sail →", W / 2, sailY + 30);
+      ctx.font = "bold 16px sans-serif";
+      ctx.fillText("Set Sail →", W / 2, sailY + 26);
 
       ctx.textAlign = "start";
     };
