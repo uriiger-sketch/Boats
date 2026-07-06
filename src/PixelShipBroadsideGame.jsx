@@ -682,16 +682,6 @@ function ControlPad({ controlRef, fireRef, onRestart, onStart, started, over, le
       )}
 
       <div className="absolute inset-0 z-20 pointer-events-none">
-        <div className="absolute left-4 top-4 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 backdrop-blur-md shadow-lg">
-          <div className="text-[11px] uppercase tracking-[0.35em] text-white/55">Pixel naval duel</div>
-          <div className="mt-1 text-sm text-white/80">Turn, broadside, survive, sink the enemy.</div>
-        </div>
-
-        <div className="absolute right-4 top-4 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 backdrop-blur-md shadow-lg text-right">
-          <div className="text-[11px] uppercase tracking-[0.35em] text-white/55">Level {String(level).padStart(1, "0")}</div>
-          <div className="mt-1 text-sm text-white/80">Gold, score, repairs, glory.</div>
-        </div>
-
         {!started && !portrait && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-auto px-4">
             <div className="max-w-xl rounded-[30px] border border-white/15 bg-black/45 px-7 py-7 backdrop-blur-xl shadow-2xl text-center">
