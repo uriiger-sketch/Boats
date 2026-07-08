@@ -366,44 +366,47 @@ const SHIP_GRID_8 = [
   ".OOOOOOOOOOOOOOOOO.",  // 37  waterline = 19 ✓
 ];
 
-// Model 9 – Leviathan boss  (17 × 36)  top-down sea serpent, no sails, scale body
+// Model 9 – Medusa boss  (17 × 36)  the creature herself: snake hair, face,
+// arms, gold top, coiled serpent tail with pale belly. No sails, no hull.
+// Palette via boss hue/trim/flag: S/F/f greens, D/d/l skin, W pale belly,
+// G gold, M near-black (mouth), O dark outline.
 const SHIP_GRID_9 = [
-  "........P........",  // 0   head tip (P = bright flag-based)
-  ".......PpP.......",  // 1   snout
-  "......OpRpO......",  // 2   eye ring (R = gold eye)
-  ".....ONhfhNO.....",  // 3   jaw (f = dark green)
-  "....ONhRSRhNO....",  // 4   two gold eyes, green center scale
-  "...ONhTDfDThNO...",  // 5   neck
-  "..ONhTDSfSDThNO..",  // 6   green scales appear
-  ".ONhTDSfDfSDThNO.",  // 7   15-wide body
-  "OSNhTDSDfDSDThNSO",  // 8   full-width — scale pattern A
-  "OBNhTDfDSDfDThNBO",  // 9   scale pattern B
-  "OSNhTDSDfDSDThNSO",  // 10  scale A
-  "OBNhTDfDSDfDThNBO",  // 11  scale B
-  "OSNhTDGDSDGDThNSO",  // 12  gold belly accent
-  "OSThdDdDdDdDdhTSO",  // 13  smooth body row
-  "OSNhTDSDfDSDThNSO",  // 14  scale A
-  "OBNhTDfDSDfDThNBO",  // 15  scale B
-  "OSNhTDSDfDSDThNSO",  // 16  scale A
-  "OSThdDdDdDdDdhTSO",  // 17  smooth
-  "OSNhTDGDSDGDThNSO",  // 18  gold belly accent
-  "OBNhTDfDSDfDThNBO",  // 19  scale B
-  "OSNhTDSDfDSDThNSO",  // 20  scale A
-  "OBNhTDfDSDfDThNBO",  // 21  scale B
-  "OSThdDdDdDdDdhTSO",  // 22  smooth
-  "OSNhTDSDfDSDThNSO",  // 23  scale A
-  "OBNhTDfDSDfDThNBO",  // 24  scale B
-  "OSNhTDGDSDGDThNSO",  // 25  gold belly accent
-  "OSThdDdDdDdDdhTSO",  // 26  smooth
-  "OSNhTDSDfDSDThNSO",  // 27  scale A — body ending
-  ".ONhTDSfDfSDThNO.",  // 28  15-wide taper
-  "..ONhTDSfSDThNO..",  // 29  13-wide
-  "...ONhTDfDThNO...",  // 30  11-wide
-  "....ONhfDfhNO....",  // 31   9-wide
-  ".....ONhDhNO.....",  // 32   7-wide
-  "......ONhNO......",  // 33   5-wide
-  ".......OhO.......",  // 34   3-wide
-  "........O........",  // 35  tail tip
+  "....F.......F....",  // 0   two snakes rearing up
+  "...fSf.....fSf...",  // 1
+  "..fSSFf...fFSSf..",  // 2   writhing hair mass
+  ".fSSSSSfffSSSSSf.",  // 3
+  "fSFSSSSSSSSSSSFSf",  // 4   full-width snake hair
+  "fSSSf.DdDdD.fSSSf",  // 5   forehead framed by snakes
+  "fSFSf.DlDlD.fSFSf",  // 6
+  "fSSSfdDFDFDdfSSSf",  // 7   glowing green eyes
+  ".fSSf.DdDdD.fSSf.",  // 8
+  ".fSFf.dDMDd.fFSf.",  // 9   mouth
+  "..fSf..DDD..fSf..",  // 10  chin, snakes falling past
+  "...f...DdD...f...",  // 11  neck
+  "..DDDdDDDDDdDDD..",  // 12  shoulders + outstretched arms
+  ".DdD..dGGGd..DdD.",  // 13  arms, gold top
+  ".DlD..GDGDG..DlD.",  // 14
+  "..D...dDDDd...D..",  // 15  hands
+  "......dDdDd......",  // 16  waist
+  ".....fSWWWSf.....",  // 17  serpent tail begins — pale belly
+  "....fSSWWWSSf....",  // 18
+  "....fSWWWWWSf....",  // 19
+  "....fSSWWWSSf....",  // 20  banded belly segments
+  "....fSWWWWWSf....",  // 21
+  "....fSSWWWSSf....",  // 22
+  ".....fSWWWSf.....",  // 23  tail narrows
+  "......fSWWWSf....",  // 24  and curves right
+  ".......fSWWSf....",  // 25
+  ".......fSWWSSf...",  // 26
+  "........fSWSSf...",  // 27
+  "........fSSSSf...",  // 28  belly ends, scale ridge
+  ".......fSSFSSf...",  // 29  curling back left
+  "......fSSFSSf....",  // 30
+  ".....fSSFSSf.....",  // 31
+  "....fSSFSSf......",  // 32
+  "...fSFSSSf.......",  // 33
+  "...fSSSf.........",  // 34
+  "....fFf..........",  // 35  tail tip
 ];
 
 const SHIP_GRIDS = [
@@ -485,7 +488,7 @@ function makeShip(side, level = 1, model = -1) {
   const enemyBucket = level <= 1 ? [0,1] : level <= 3 ? [1,2,3] : level <= 5 ? [2,3,4,5] : [5,6,7,8];
   const enemyModel = enemyBucket[Math.floor(rand(0, enemyBucket.length))];
   const assignedModel = model >= 0 ? model : (player ? 6 : boss ? 9 : enemyModel);
-  const maxHp = player ? 150 : boss ? 675 : 195 + level * 30;
+  const maxHp = player ? 150 : boss ? 675 + (level - 1) * 60 : 195 + level * 30;
   return {
     id: ++_sid,
     side,
@@ -500,7 +503,7 @@ function makeShip(side, level = 1, model = -1) {
     speed: 0.06,
     vx: 0,
     vy: 0,
-    maxSpeed: player ? 0.13 : boss ? 0.10 : 0.118 + level * 0.005,
+    maxSpeed: player ? 0.13 : boss ? Math.min(0.125, 0.10 + (level - 1) * 0.002) : 0.118 + level * 0.005,
     health: maxHp,
     maxHealth: maxHp,
     armor: boss ? 6 : 0,
@@ -516,9 +519,9 @@ function makeShip(side, level = 1, model = -1) {
     sunk: false,
     gazeTimer: 0,
     gazeCD: 0,
-    hue: player ? "#7a4520" : boss ? "#1a0d2e" : "#5a3018",
-    trim: player ? "#c87840" : boss ? "#2d1455" : "#9a6035",
-    flag: player ? "#c01828" : boss ? "#00ff88" : "#1830a8",
+    hue: player ? "#7a4520" : boss ? "#0e2818" : "#5a3018",
+    trim: player ? "#c87840" : boss ? "#c89464" : "#9a6035",
+    flag: player ? "#c01828" : boss ? "#2e9e50" : "#1830a8",
     wakeTrail: [],
   };
 }
@@ -546,22 +549,47 @@ const UPGRADES = [
   { name: "Chain Shot",     desc: "+15% cannon range",   cost: 5, maxLv: 3, key: "range" },
 ];
 
-function spawnEnemies(level, totalKills, player) {
-  if (totalKills >= 8) {
+// Medusa appears every ~10 kills (8, 18, 28…); between bosses the waves mix
+// ring/convoy formations and, after the first Medusa falls, elite flagships.
+function spawnEnemies(level, totalKills, player, bossesKilled = 0) {
+  if (totalKills >= 8 + bossesKilled * 10) {
     const boss = makeShip("boss", level);
     const bossAng = rand(0, PI2);
     boss.x = clamp(player.x + Math.cos(bossAng) * 700, 150, WORLD_W - 150);
     boss.y = clamp(player.y + Math.sin(bossAng) * 700, 150, WORLD_H - 150);
-    return [boss];
+    const pack = [boss];
+    // Later Medusas arrive with an escort fleet
+    for (let i = 0; i < Math.min(bossesKilled, 3); i++) {
+      const esc = makeShip("enemy", level);
+      const a = bossAng + (i % 2 === 0 ? 1 : -1) * 0.55 * (1 + Math.floor(i / 2));
+      esc.x = clamp(player.x + Math.cos(a) * 800, 120, WORLD_W - 120);
+      esc.y = clamp(player.y + Math.sin(a) * 800, 120, WORLD_H - 120);
+      pack.push(esc);
+    }
+    return pack;
   }
-  const count = Math.min(2 + Math.floor(level / 2), 6);
+  const count = Math.min(2 + Math.floor(level / 2) + (bossesKilled > 0 ? 1 : 0), 7);
   const enemies = [];
+  const convoy = level % 3 === 0;
+  const convoyAng = rand(0, PI2);
   for (let i = 0; i < count; i++) {
     const e = makeShip("enemy", level);
-    const ang = (i / count) * PI2 + rand(-0.2, 0.2);
-    const dist = 650 + i * 80;
+    const ang = convoy ? convoyAng + rand(-0.12, 0.12) : (i / count) * PI2 + rand(-0.2, 0.2);
+    const dist = convoy ? 700 + i * 110 : 650 + i * 80;
     e.x = clamp(player.x + Math.cos(ang) * dist, 120, WORLD_W - 120);
     e.y = clamp(player.y + Math.sin(ang) * dist, 120, WORLD_H - 120);
+    if (bossesKilled > 0 && i === 0) {
+      e.elite = true;
+      e.model = Math.min(8, e.model + 2);
+      e.maxHealth = Math.round(e.maxHealth * 1.6);
+      e.health = e.maxHealth;
+      e.dmgBonus += 4;
+      e.maxSpeed += 0.008;
+      e.armor = 2;
+      e.hue = "#3a1410";
+      e.trim = "#8a3838";
+      e.flag = "#e02020";
+    }
     enemies.push(e);
   }
   return enemies;
@@ -570,6 +598,7 @@ function spawnEnemies(level, totalKills, player) {
 function makeGame(prev = null) {
   const level = prev ? prev.level : 1;
   const totalKills = prev ? prev.totalKills : 0;
+  const bossesKilled = prev ? (prev.bossesKilled || 0) : 0;
   const gold = prev ? prev.gold : 0;
   const score = prev ? prev.score : 0;
   const upgrades = prev ? prev.upgrades : { hull: 0, speed: 0, reload: 0, damage: 0, arc: 0, multishot: 0, turn: 0, regen: 0, range: 0 };
@@ -584,7 +613,7 @@ function makeGame(prev = null) {
   player.maxSpeed = 0.13 * (1 + upgrades.speed * 0.12);
   player.turnMult = 1 + upgrades.turn * 0.20;
 
-  const enemies = spawnEnemies(level, totalKills, player);
+  const enemies = spawnEnemies(level, totalKills, player, bossesKilled);
 
   const islands = prev ? prev.islands : Array.from({ length: 4 }, () => {
     const isle = {
@@ -608,6 +637,7 @@ function makeGame(prev = null) {
     victory: false,
     level,
     totalKills,
+    bossesKilled,
     score,
     gold,
     upgrades,
@@ -1068,6 +1098,15 @@ function PixelShipBroadsideGame() {
     const drawShot = (p) => {
       const x = toScreenX(p.x);
       const y = toScreenY(p.y);
+      if (p.venom) {
+        ctx.fillStyle = "rgba(60,220,90,0.4)";
+        ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 6, 6);
+        ctx.fillStyle = "#2fd050";
+        ctx.fillRect(Math.round(x), Math.round(y), 4, 4);
+        ctx.fillStyle = "#c8ffa0";
+        ctx.fillRect(Math.round(x + 1), Math.round(y + 1), 2, 2);
+        return;
+      }
       ctx.fillStyle = "#151515";
       ctx.fillRect(Math.round(x), Math.round(y), 3, 3);
       ctx.fillStyle = "rgba(255,255,255,0.18)";
@@ -1116,15 +1155,17 @@ function PixelShipBroadsideGame() {
       }
 
       if (s.flash > 0) {
-        const side = s.flashSide || 1;
+        const side = s.flashSide === 0 ? 0 : (s.flashSide || 1);
         const famt = clamp(s.flash * 3.5, 0, 1);
-        const fx = Math.round(side * (hW + 7));
+        // side 0 = frontal (Medusa venom) — flash at the head, tinted green
+        const fx = side === 0 ? 0 : Math.round(side * (hW + 7));
+        const fy = side === 0 ? -hH - 8 : 0;
         ctx.globalAlpha = famt * 0.92;
-        ctx.fillStyle = "#ffe860";
-        ctx.beginPath(); ctx.arc(fx, 0, 10, 0, PI2); ctx.fill();
+        ctx.fillStyle = side === 0 ? "#50e878" : "#ffe860";
+        ctx.beginPath(); ctx.arc(fx, fy, 10, 0, PI2); ctx.fill();
         ctx.globalAlpha = famt * 0.75;
         ctx.fillStyle = "#ffffff";
-        ctx.beginPath(); ctx.arc(fx, 0, 5, 0, PI2); ctx.fill();
+        ctx.beginPath(); ctx.arc(fx, fy, 5, 0, PI2); ctx.fill();
         ctx.globalAlpha = 1;
       }
 
@@ -1195,16 +1236,25 @@ function PixelShipBroadsideGame() {
       const rightX = -Math.sin(shooter.angle);
       const rightY = Math.cos(shooter.angle);
       const lateral = gridHalfW(getGrid(shooter.model)) + 4;
+      const halfLen = gridHalfH(getGrid(shooter.model));
       const isBoss = shooter.side === "boss";
+      const frontal = broadside === 0; // Medusa venom fan, fired from the head
       const playerMultishot = shooter.side === "player" && g.upgrades.multishot > 0;
       const muzzleOffsets = isBoss ? [-18, -9, 0, 9, 18] :
         playerMultishot ? [-14, -7, 0, 7, 14] : [-11, -3, 5, 13];
       const dmgBonus = shooter.side === "player" ? g.upgrades.damage * 4 : (shooter.dmgBonus || 0);
       muzzleOffsets.forEach((off, i) => {
-        const ang = shooter.angle + broadside * Math.PI / 2 + (i - (muzzleOffsets.length - 1) / 2) * 0.03;
+        const centered = i - (muzzleOffsets.length - 1) / 2;
+        const ang = frontal
+          ? shooter.angle + centered * 0.12
+          : shooter.angle + broadside * Math.PI / 2 + centered * 0.03;
         const spd = 3.55 + rand(-0.12, 0.16);
-        const px = shooter.x + fwdX * off + rightX * broadside * lateral;
-        const py = shooter.y + fwdY * off + rightY * broadside * lateral;
+        const px = frontal
+          ? shooter.x + fwdX * halfLen * 0.85 + rightX * off * 0.25
+          : shooter.x + fwdX * off + rightX * broadside * lateral;
+        const py = frontal
+          ? shooter.y + fwdY * halfLen * 0.85 + rightY * off * 0.25
+          : shooter.y + fwdY * off + rightY * broadside * lateral;
         g.shots.push({
           x: px,
           y: py,
@@ -1215,13 +1265,14 @@ function PixelShipBroadsideGame() {
           b: broadside,
           r: 6,
           dmgBonus,
+          venom: frontal && isBoss,
         });
         for (let n = 0; n < 2; n++) {
-          g.particles.sparks.push({ x: px, y: py, vx: rand(-0.25, 0.25), vy: rand(-0.18, 0.1), life: 12, maxLife: 12, r: 255, g: 220, b: 120 });
+          g.particles.sparks.push({ x: px, y: py, vx: rand(-0.25, 0.25), vy: rand(-0.18, 0.1), life: 12, maxLife: 12, r: frontal ? 60 : 255, g: frontal ? 255 : 220, b: frontal ? 110 : 120 });
         }
       });
-      const mx = shooter.x + rightX * broadside * lateral;
-      const my = shooter.y + rightY * broadside * lateral;
+      const mx = shooter.x + (frontal ? fwdX * halfLen * 0.85 : rightX * broadside * lateral);
+      const my = shooter.y + (frontal ? fwdY * halfLen * 0.85 : rightY * broadside * lateral);
       for (let n = 0; n < 12; n++) {
         g.particles.smoke.push({ x: mx, y: my, vx: rand(-0.14, 0.14), vy: rand(-0.20, -0.02), life: 42, maxLife: 42, size: rand(5, 13), r: 82, g: 82, b: 90 });
       }
@@ -1293,8 +1344,8 @@ function PixelShipBroadsideGame() {
       let thrustInput = clamp(thrust + (up ? 1 : 0) - (down ? 1 : 0), -1, 1);
 
       if (p.gazeTimer > 0) {
-        steerInput *= 0.4;
-        thrustInput *= 0.5;
+        steerInput *= 0.65;
+        thrustInput *= 0.72;
         p.gazeTimer = Math.max(0, p.gazeTimer - dt);
       }
 
@@ -1318,6 +1369,7 @@ function PixelShipBroadsideGame() {
         let tgtDist = Math.sqrt(dist2(p.x, p.y, e.x, e.y));
         for (const other of g.enemies) {
           if (other === e || other.health <= 0) continue;
+          if (e.side === "boss" || other.side === "boss") continue; // Medusa and her escorts never turn on each other
           const d = Math.sqrt(dist2(other.x, other.y, e.x, e.y));
           if (d < tgtDist * 0.3) { tgt = other; tgtDist = d; }
         }
@@ -1342,8 +1394,8 @@ function PixelShipBroadsideGame() {
           e.gazeCD = Math.max(0, e.gazeCD - dt);
           const distToPlayer = Math.sqrt(dist2(p.x, p.y, e.x, e.y));
           if (e.gazeCD <= 0 && distToPlayer < 340) {
-            e.gazeCD = 5000;
-            p.gazeTimer = 4000;
+            e.gazeCD = 6500;
+            p.gazeTimer = 2200;
             g.shake = Math.max(g.shake, 2.0);
             const ang = Math.atan2(p.y - e.y, p.x - e.x);
             for (let n = 0; n < 14; n++) {
@@ -1355,12 +1407,19 @@ function PixelShipBroadsideGame() {
           }
         }
 
-        // Enemy fires at its target
+        // Enemy fires at its target. Medusa spits venom straight ahead from
+        // her head; ships fire broadsides from their flanks.
         const bearingFromEnemy = normalizeAngle(Math.atan2(tgt.y - e.y, tgt.x - e.x) - e.angle);
-        const enemyArcSide = Math.abs(Math.abs(bearingFromEnemy) - Math.PI / 2) < ARC_HALF ? sign(bearingFromEnemy) : 0;
         const enemyFireRange = clamp(300 + (e.level || 1) * 20, 340, 500);
-        if (e.reload <= 0 && enemyArcSide !== 0 && tgtDist < enemyFireRange) {
-          fireBroadside(e, enemyArcSide);
+        if (e.side === "boss") {
+          if (e.reload <= 0 && Math.abs(bearingFromEnemy) < 0.55 && tgtDist < enemyFireRange) {
+            fireBroadside(e, 0);
+          }
+        } else {
+          const enemyArcSide = Math.abs(Math.abs(bearingFromEnemy) - Math.PI / 2) < ARC_HALF ? sign(bearingFromEnemy) : 0;
+          if (e.reload <= 0 && enemyArcSide !== 0 && tgtDist < enemyFireRange) {
+            fireBroadside(e, enemyArcSide);
+          }
         }
       }
 
@@ -1473,7 +1532,8 @@ function PixelShipBroadsideGame() {
         for (const s of allShips) {
           if (s.id === b.owner) continue;
           if (s.health <= 0) continue;
-          if (dist2(b.x, b.y, s.x, s.y) < 440) {
+          const hitR2 = s.side === "boss" ? 1600 : 440; // Medusa's coils are a bigger target
+          if (dist2(b.x, b.y, s.x, s.y) < hitR2) {
             const rawDmg = 8 + rand(0, 7) + (b.dmgBonus || 0);
             const dmg = Math.max(1, rawDmg - s.armor);
             s.health -= dmg;
@@ -1536,10 +1596,12 @@ function PixelShipBroadsideGame() {
           e.sunk = true;
           g.totalKills += 1;
           const isBoss = e.side === "boss";
-          const goldReward = isBoss ? 25 : 3 + g.level;
+          if (isBoss) g.bossesKilled = (g.bossesKilled || 0) + 1;
+          const goldReward = isBoss ? 25 + (g.bossesKilled - 1) * 10 : e.elite ? 8 + g.level : 3 + g.level;
           g.gold += goldReward;
-          g.score += isBoss ? 500 : 250;
-          g.message = isBoss ? `MEDUSA DEFEATED! +${goldReward} gold!` : `Enemy sunk! +${goldReward} gold`;
+          g.score += isBoss ? 500 : e.elite ? 400 : 250;
+          g.message = isBoss ? `MEDUSA DEFEATED! +${goldReward} gold!` :
+            e.elite ? `Elite flagship sunk! +${goldReward} gold` : `Enemy sunk! +${goldReward} gold`;
           g.messageTimer = isBoss ? 4 : 2.5;
           setUi(s => ({ ...s, score: g.score, gold: g.gold }));
         }
@@ -1831,8 +1893,8 @@ function PixelShipBroadsideGame() {
         const bw = isBoss ? 280 : 180;
         const bx = W - bw - 20;
         const by = 22 + i * 30;
-        const col = isBoss ? "rgba(0,200,100,0.9)" : "rgba(255,90,90,0.9)";
-        bar(bx, by, bw, Math.max(0, e.health), e.maxHealth, isBoss ? "MEDUSA" : `ENEMY ${i + 1}`, col);
+        const col = isBoss ? "rgba(0,200,100,0.9)" : e.elite ? "rgba(255,160,40,0.9)" : "rgba(255,90,90,0.9)";
+        bar(bx, by, bw, Math.max(0, e.health), e.maxHealth, isBoss ? "MEDUSA" : e.elite ? "ELITE" : `ENEMY ${i + 1}`, col);
       });
 
       // Score / Gold / Level strip
@@ -1858,7 +1920,7 @@ function PixelShipBroadsideGame() {
           ctx.save();
           ctx.translate(ex, ey);
           ctx.rotate(ang);
-          ctx.fillStyle = e.side === "boss" ? "rgba(0,220,100,0.9)" : "rgba(255,85,105,0.85)";
+          ctx.fillStyle = e.side === "boss" ? "rgba(0,220,100,0.9)" : e.elite ? "rgba(255,160,40,0.9)" : "rgba(255,85,105,0.85)";
           ctx.beginPath();
           ctx.moveTo(10, 0);
           ctx.lineTo(-6, -7);
@@ -1869,7 +1931,7 @@ function PixelShipBroadsideGame() {
           ctx.fillStyle = e.side === "boss" ? "rgba(0,255,130,0.9)" : "rgba(255,255,255,0.85)";
           ctx.font = "11px sans-serif";
           ctx.textAlign = "center";
-          ctx.fillText(e.side === "boss" ? "MEDUSA" : "ENEMY", ex, ey + (ey < H / 2 ? 22 : -16));
+          ctx.fillText(e.side === "boss" ? "MEDUSA" : e.elite ? "ELITE" : "ENEMY", ex, ey + (ey < H / 2 ? 22 : -16));
           ctx.textAlign = "start";
         }
       }
