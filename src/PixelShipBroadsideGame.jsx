@@ -19,7 +19,7 @@ const DRAG_QUADRATIC = 0.0044;
 const LATERAL_DAMP = 0.02;
 const REVERSE_FRAC = 0.35;
 
-const SHIP_CELL = 3;
+const SHIP_CELL = 4;
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -431,7 +431,7 @@ function drawSpriteGrid(ctx, grid, originX, originY, cell, colorFor) {
 function shipColorFor(s) {
   const O_c = shade(s.hue, -65);
   const N_c = shade(s.hue, -35);
-  const h_c = shade(s.hue,  52);
+  const h_c = shade(s.hue,  72);
   const T_c = shade(s.hue,   8);
   const D_c = s.trim;
   const d_c = shade(s.trim, -42);
@@ -922,6 +922,28 @@ function PixelShipBroadsideGame() {
       ctx.fillRect(Math.round(x - 11 * s), Math.round(y -  6 * s), Math.round(22 * s), Math.round(12 * s));
     };
 
+    const drawPalmTree = (px, py) => {
+      const tx = Math.round(px), ty = Math.round(py);
+      ctx.fillStyle = "#4a2208";
+      for (let i = 0; i < 8; i++) ctx.fillRect(tx - 1, ty - i * 4, 3, 3);
+      ctx.fillStyle = "#6a3810";
+      for (let i = 0; i < 8; i++) ctx.fillRect(tx, ty - i * 4, 1, 3);
+      ctx.fillStyle = "#1a5c14";
+      ctx.fillRect(tx - 14, ty - 30, 13, 4);
+      ctx.fillRect(tx + 2,  ty - 30, 13, 4);
+      ctx.fillRect(tx - 9,  ty - 36, 10, 4);
+      ctx.fillRect(tx + 1,  ty - 36, 10, 4);
+      ctx.fillRect(tx - 5,  ty - 42, 10, 4);
+      ctx.fillStyle = "#2a8020";
+      ctx.fillRect(tx - 12, ty - 32, 10, 3);
+      ctx.fillRect(tx + 3,  ty - 32, 10, 3);
+      ctx.fillRect(tx - 7,  ty - 38, 8,  3);
+      ctx.fillRect(tx + 1,  ty - 38, 8,  3);
+      ctx.fillRect(tx - 3,  ty - 44, 6,  3);
+      ctx.fillStyle = "#7a5018";
+      ctx.fillRect(tx - 2, ty - 33, 4, 4);
+    };
+
     const drawIsland = (isle, t) => {
       const x = toScreenX(isle.x);
       const y = toScreenY(isle.y);
@@ -965,6 +987,10 @@ function PixelShipBroadsideGame() {
       ctx.fillRect(Math.round(x - iw * 0.06), Math.round(y - ih * 0.06), Math.round(iw * 0.12), Math.round(ih * 0.10));
       ctx.fillStyle = "#5aaa44";
       ctx.fillRect(Math.round(x - iw * 0.02), Math.round(y - ih * 0.04), Math.round(iw * 0.04), Math.round(ih * 0.06));
+      if (iw > 100) {
+        drawPalmTree(x - iw * 0.08, y - ih * 0.10);
+        if (iw > 130) drawPalmTree(x + iw * 0.10, y - ih * 0.06);
+      }
     };
 
     const drawBarrel = (b, t) => {
@@ -1003,7 +1029,7 @@ function PixelShipBroadsideGame() {
     const drawSpark = (p) => {
       const a = clamp(p.life / p.maxLife, 0, 1);
       ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${a})`;
-      ctx.fillRect(Math.round(toScreenX(p.x)), Math.round(toScreenY(p.y)), 1, 1);
+      ctx.fillRect(Math.round(toScreenX(p.x)), Math.round(toScreenY(p.y)), 2, 2);
     };
 
     const drawSplash = (p) => {
@@ -1018,14 +1044,24 @@ function PixelShipBroadsideGame() {
 
     const drawExplosion = (p) => {
       const a = clamp(p.life, 0, 1);
-      const radius = p.r * (1 + (1 - a) * 2.2);
+      const radius = p.r * (1 + (1 - a) * 2.6);
       const sx = toScreenX(p.x);
       const sy = toScreenY(p.y);
-      ctx.globalAlpha = a * 0.85;
-      ctx.fillStyle = a > 0.55 ? "#ff8800" : "#aa3311";
+      ctx.globalAlpha = a * 0.90;
+      if      (a > 0.72) ctx.fillStyle = "#ffe050";
+      else if (a > 0.50) ctx.fillStyle = "#ff6e00";
+      else if (a > 0.28) ctx.fillStyle = "#cc2600";
+      else               ctx.fillStyle = "#551000";
       ctx.beginPath();
       ctx.arc(sx, sy, radius, 0, PI2);
       ctx.fill();
+      if (a > 0.52) {
+        ctx.globalAlpha = a * 0.50;
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(sx, sy, radius * 0.36, 0, PI2);
+        ctx.fill();
+      }
       ctx.globalAlpha = 1;
     };
 
@@ -1081,9 +1117,15 @@ function PixelShipBroadsideGame() {
 
       if (s.flash > 0) {
         const side = s.flashSide || 1;
-        ctx.fillStyle = "rgba(255,248,196,0.9)";
-        ctx.fillRect(Math.round(side * (hW + 1)), -3, 5, 6);
-        ctx.fillRect(Math.round(side * (hW + 1)), 5, 5, 6);
+        const famt = clamp(s.flash * 3.5, 0, 1);
+        const fx = Math.round(side * (hW + 7));
+        ctx.globalAlpha = famt * 0.92;
+        ctx.fillStyle = "#ffe860";
+        ctx.beginPath(); ctx.arc(fx, 0, 10, 0, PI2); ctx.fill();
+        ctx.globalAlpha = famt * 0.75;
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath(); ctx.arc(fx, 0, 5, 0, PI2); ctx.fill();
+        ctx.globalAlpha = 1;
       }
 
       if (s.gazeTimer > 0) {
@@ -1180,8 +1222,8 @@ function PixelShipBroadsideGame() {
       });
       const mx = shooter.x + rightX * broadside * lateral;
       const my = shooter.y + rightY * broadside * lateral;
-      for (let n = 0; n < 9; n++) {
-        g.particles.smoke.push({ x: mx, y: my, vx: rand(-0.12, 0.12), vy: rand(-0.16, -0.02), life: 36, maxLife: 36, size: rand(2, 5), r: 88, g: 88, b: 94 });
+      for (let n = 0; n < 12; n++) {
+        g.particles.smoke.push({ x: mx, y: my, vx: rand(-0.14, 0.14), vy: rand(-0.20, -0.02), life: 42, maxLife: 42, size: rand(5, 13), r: 82, g: 82, b: 90 });
       }
       for (let n = 0; n < 6; n++) {
         g.particles.embers.push({ x: mx, y: my, vx: rand(-0.2, 0.2), vy: rand(-0.2, 0.0), life: 18, maxLife: 18, size: rand(1, 2), r: 255, g: rand(120, 200), b: rand(70, 110) });
@@ -1440,14 +1482,17 @@ function PixelShipBroadsideGame() {
             const isPlayerShot = b.owner === p.id;
             if (isPlayerShot) g.score += 18;
             g.shake = Math.max(g.shake, isPlayerHit ? 3.5 : 3.0);
-            for (let n = 0; n < 12; n++) g.particles.smoke.push({ x: b.x, y: b.y, vx: rand(-0.24, 0.24), vy: rand(-0.2, 0.08), life: 30, maxLife: 30, size: rand(2, 5), r: 85, g: 85, b: 92 });
+            for (let n = 0; n < 16; n++) g.particles.smoke.push({ x: b.x, y: b.y, vx: rand(-0.28, 0.28), vy: rand(-0.22, 0.10), life: 38, maxLife: 38, size: rand(4, 11), r: 80, g: 80, b: 88 });
             for (let n = 0; n < 14; n++) g.particles.sparks.push({ x: b.x, y: b.y, vx: rand(-0.58, 0.58), vy: rand(-0.48, 0.22), life: 16, maxLife: 16, r: 255, g: rand(140, 220), b: rand(65, 120) });
             for (let n = 0; n < 9; n++) g.particles.splashes.push({ x: b.x, y: b.y, vx: rand(-0.48, 0.48), vy: rand(-0.62, -0.15), life: 18, maxLife: 18, size: rand(2, 4), r: 140, g: 210, b: 255 });
             if (s.health <= 0) {
-              for (let n = 0; n < 18; n++) {
+              for (let n = 0; n < 28; n++) {
                 const ea = rand(0, PI2);
-                const espd = rand(0.05, 0.28);
-                g.particles.explosions.push({ x: s.x, y: s.y, vx: Math.cos(ea) * espd, vy: Math.sin(ea) * espd, life: 1, maxLife: 1, r: rand(10, 22) });
+                const espd = rand(0.04, 0.32);
+                g.particles.explosions.push({ x: s.x, y: s.y, vx: Math.cos(ea) * espd, vy: Math.sin(ea) * espd, life: 1, maxLife: 1, r: rand(12, 28) });
+              }
+              for (let n = 0; n < 18; n++) {
+                g.particles.smoke.push({ x: s.x + rand(-12, 12), y: s.y + rand(-12, 12), vx: rand(-0.12, 0.12), vy: rand(-0.18, -0.02), life: 55, maxLife: 55, size: rand(8, 18), r: 55, g: 52, b: 58 });
               }
             }
             g.shots.splice(i, 1);
@@ -1555,16 +1600,17 @@ function PixelShipBroadsideGame() {
           const wh = h1 * 0.44 + h2 * 0.28 + h3 * 0.16 + h4 * 0.12;
 
           let cr, cg, cb;
-          if      (wh < -0.60) { cr =   2; cg =  16; cb =  44; }
-          else if (wh < -0.42) { cr =   4; cg =  26; cb =  58; }
-          else if (wh < -0.24) { cr =   8; cg =  42; cb =  82; }
-          else if (wh < -0.06) { cr =  14; cg =  58; cb = 110; }
-          else if (wh <  0.10) { cr =  20; cg =  78; cb = 140; }
-          else if (wh <  0.28) { cr =  30; cg = 104; cb = 165; }
-          else if (wh <  0.46) { cr =  50; cg = 146; cb = 192; }
-          else if (wh <  0.64) { cr = 100; cg = 188; cb = 228; }
-          else if (wh <  0.76) { cr = 152; cg = 212; cb = 242; }
-          else                 { cr = 212; cg = 238; cb = 253; }
+          if      (wh < -0.60) { cr =   1; cg =   8; cb =  28; }
+          else if (wh < -0.44) { cr =   3; cg =  18; cb =  52; }
+          else if (wh < -0.26) { cr =   6; cg =  36; cb =  78; }
+          else if (wh < -0.08) { cr =  12; cg =  56; cb = 112; }
+          else if (wh <  0.10) { cr =  18; cg =  80; cb = 148; }
+          else if (wh <  0.28) { cr =  28; cg = 112; cb = 175; }
+          else if (wh <  0.46) { cr =  52; cg = 150; cb = 200; }
+          else if (wh <  0.60) { cr =  95; cg = 188; cb = 226; }
+          else if (wh <  0.72) { cr = 152; cg = 218; cb = 242; }
+          else if (wh <  0.84) { cr = 205; cg = 238; cb = 250; }
+          else                 { cr = 238; cg = 250; cb = 255; }
 
           ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
           ctx.fillRect(sx, sy, SEA_TILE, SEA_TILE);
