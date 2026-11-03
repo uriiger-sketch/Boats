@@ -11,6 +11,8 @@ Crimson Galleon boss, then spend your plunder on upgrades in the harbor between 
 | `web/` | The game: plain HTML5 canvas + JavaScript, no dependencies, works offline. Open `web/index.html` in any browser to play. |
 | `ios/BroadsideOfTheDeep.xcodeproj` | Native iOS app (Swift, UIKit + WKWebView) that bundles `web/` as a resource. |
 | `.github/workflows/ios.yml` | CI: checks the JS syntax and builds the iOS app on macOS for simulator and device. |
+| `.github/workflows/testflight.yml` | One-click archive, sign and upload to App Store Connect / TestFlight. |
+| `Dockerfile`, `Caddyfile`, `railway.json` | Static hosting of the web build on Railway. |
 | `Boats_main` | The original React prototype, kept for reference. |
 
 ## Gameplay
@@ -38,6 +40,15 @@ Requirements: a Mac with Xcode 15 or later and a paid Apple Developer Program me
 4. In [App Store Connect](https://appstoreconnect.apple.com), create a new app with the same bundle ID.
 5. In Xcode, pick **Any iOS Device (arm64)**, then **Product > Archive**, then **Distribute App > App Store Connect > Upload**.
 6. In App Store Connect, fill in the listing (screenshots, description, age rating, privacy) and submit for review.
+
+### Automated upload from GitHub (optional, no Mac needed after setup)
+
+1. In App Store Connect, go to **Users and Access > Integrations > App Store Connect API** and create a key with the **App Manager** role. Download the `.p8` file and note the **Key ID** and **Issuer ID**.
+2. Create the app record in App Store Connect with your bundle ID.
+3. In the GitHub repo, open **Settings > Secrets and variables > Actions** and add:
+   `APPLE_TEAM_ID`, `APP_BUNDLE_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_KEY_P8` (paste the whole `.p8` file contents).
+4. Go to **Actions > Upload to TestFlight > Run workflow**. The build number is the run number, so it increases automatically.
+5. When processing finishes, the build appears in TestFlight. Select it for an App Store version and submit for review.
 
 Already set up for review:
 
