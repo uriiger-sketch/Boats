@@ -1,0 +1,43 @@
+name: iOS build
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax-check game scripts
+        run: for f in web/js/*.js; do node --check "$f"; done
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode version
+        run: xcodebuild -version
+      - name: Build for iOS Simulator (unsigned)
+        run: |
+          xcodebuild -project ios/BroadsideOfTheDeep.xcodeproj \
+            -scheme BroadsideOfTheDeep \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Verify bundled game
+        run: |
+          APP=$(find ~/Library/Developer/Xcode/DerivedData -name BroadsideOfTheDeep.app -type d | head -1)
+          ls "$APP/web" "$APP/web/js"
+          test -f "$APP/web/index.html"
+      - name: Build for device (unsigned, archive check)
+        run: |
+          xcodebuild -project ios/BroadsideOfTheDeep.xcodeproj \
+            -scheme BroadsideOfTheDeep \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO build
