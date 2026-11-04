@@ -60,7 +60,7 @@
     const ok = Input.edge('enter') || (G.state !== 'playing' && G.state !== 'clearing' && Input.edge(' '));
     const esc = Input.edge('escape') || Input.edge('p');
     switch (G.state) {
-      case 'title': if (ok) newGame(); break;
+      case 'title': if (ok) { if (loadRun()) continueGame(); else newGame(); } break;
       case 'shop': {
         if (ok) setSail();
         for (let i = 0; i < UPGRADES.length; i++) if (Input.edge(String(i + 1))) buyUpgrade(UPGRADES[i]);

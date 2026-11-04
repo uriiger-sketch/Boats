@@ -218,6 +218,15 @@ function drawHUD(ctx) {
   const wa = G.wind.a;
   for (let i = -3; i <= 3; i++) { ctx.fillStyle = i > 1 ? '#ffffff' : '#9fd4f0'; ctx.fillRect(Math.round(wx + Math.cos(wa) * i) , Math.round(wy + Math.sin(wa) * i), 1, 1); }
   txt(ctx, 'WIND', wx - 9, wy - 3, '#9fd4f0', { align: 'right' });
+  // Voyage saved toast.
+  if (G.savedT > 0 && (G.savedT > 0.6 || Math.floor(G.t * 10) % 2)) {
+    const y = Math.round(view.h - view.safe.b - 14);
+    const label = 'VOYAGE SAVED';
+    const w = Font.width(label) + 22;
+    drawPanel(ctx, cx - Math.round(w / 2), y - 4, w, 15, 'dark');
+    ctx.drawImage(Art.icons.anchor, cx - Math.round(w / 2) + 5, y - 1);
+    txt(ctx, label, cx + 5, y, '#7dff9a', { align: 'center' });
+  }
   // Combo.
   if (G.combo >= 2 && G.comboT > 0) {
     const y = T + (G.boss && G.boss.alive ? 38 : 20);
@@ -362,9 +371,16 @@ function drawTitle(ctx) {
   const by = Math.round(view.h * 0.56);
   const pw = Math.min(view.w - 30, 200);
   const pulse = Math.floor(G.t * 2.5) % 2;
-  drawButton(ctx, 'play', view.w / 2 - 50, by, 100, 20, 'SET SAIL!', () => { newGame(); }, { color: pulse ? '#d8433b' : '#e8564c' });
+  const save = loadRun();
+  if (save) {
+    const cw = 118, nw = 76, gap = 6, x0 = Math.round(view.w / 2 - (cw + nw + gap) / 2);
+    drawButton(ctx, 'continue', x0, by, cw, 20, 'CONTINUE: WAVE ' + save.wave, continueGame, { color: pulse ? '#d8433b' : '#e8564c' });
+    drawButton(ctx, 'play', x0 + cw + gap, by, nw, 20, 'NEW GAME', () => { newGame(); }, { color: '#8a5530' });
+  } else {
+    drawButton(ctx, 'play', view.w / 2 - 50, by, 100, 20, 'SET SAIL!', () => { newGame(); }, { color: pulse ? '#d8433b' : '#e8564c' });
+  }
   toggleRow(ctx, view.w / 2 - pw / 2, by + 26, pw, 14, 4);
-  const best = G.best ? 'BEST ' + G.best + '   WAVE ' + G.bestWave : 'SINK THE ENEMY FLEET, WAVE BY WAVE';
+  const best = save ? 'SAVED: ' + save.gold + ' GOLD   SCORE ' + save.score : G.best ? 'BEST ' + G.best + '   WAVE ' + G.bestWave : 'SINK THE ENEMY FLEET, WAVE BY WAVE';
   txt(ctx, best, view.w / 2, by + 46, '#ffe27a', { align: 'center' });
   if (!Input.touchMode && !IS_IOS) txt(ctx, 'ENTER TO START', view.w / 2, view.h - view.safe.b - 11, 'rgba(255,255,255,0.75)', { align: 'center' });
   else if (CAN_INSTALL_IOS) txt(ctx, 'TIP: SHARE > ADD TO HOME SCREEN TO INSTALL', view.w / 2, view.h - view.safe.b - 11, '#9fd4f0', { align: 'center' });
@@ -421,7 +437,7 @@ function drawShop(ctx) {
   });
   const ps = playerStats();
   Font.draw(ctx, 'HULL ' + Math.ceil(G.player.hp) + '/' + ps.maxHp + '   GUNS ' + ps.guns + '   KEGS ' + G.kegCount, x + 10, py + h - 20, '#5a3518');
-  drawButton(ctx, 'sail', x + w - 96, py + h - 25, 86, 18, 'SET SAIL >', setSail, { color: '#4a9a3a' });
+  drawButton(ctx, 'sail', x + w - 96, py + h - 25, 86, 18, 'SAVE + SAIL >', setSail, { color: '#4a9a3a' });
 }
 
 function drawGameOver(ctx) {
