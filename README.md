@@ -13,6 +13,14 @@ Crimson Galleon boss, then spend your plunder on upgrades in the harbor between 
 | `.github/workflows/ios.yml` | CI: checks the JS syntax and builds the iOS app on macOS for simulator and device. |
 | `.github/workflows/testflight.yml` | One-click archive, sign and upload to App Store Connect / TestFlight. |
 | `Dockerfile`, `Caddyfile`, `railway.json` | Static hosting of the web build on Railway. |
+| `.github/workflows/live-check.yml` | Loads and plays the live site in a real browser after each deploy, and daily. |
+
+## Play now / install on iPhone without the App Store
+
+Live: **https://web-production-a91e2.up.railway.app**
+
+On iPhone or iPad, open the link in Safari, tap **Share > Add to Home Screen**. It installs with its own icon,
+launches full screen in landscape, and works offline (service worker). Android Chrome offers **Install app**.
 | `Boats_main` | The original React prototype, kept for reference. |
 
 ## Gameplay

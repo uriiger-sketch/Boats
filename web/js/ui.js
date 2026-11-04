@@ -4,6 +4,9 @@
 // ---------------------------------------------------------------------------
 
 const INK = '#1a1220';
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+// Safari on iOS in a normal tab (not already installed, not inside the native app).
+const CAN_INSTALL_IOS = IS_IOS && /^https?:$/.test(location.protocol) && !navigator.standalone && !(window.matchMedia && matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches);
 const _shadeCache = new Map();
 const sh = (c, a) => { const k = c + a; let v = _shadeCache.get(k); if (!v) { v = shadeHex(c, a); _shadeCache.set(k, v); } return v; };
 
@@ -363,7 +366,8 @@ function drawTitle(ctx) {
   toggleRow(ctx, view.w / 2 - pw / 2, by + 26, pw, 14, 4);
   const best = G.best ? 'BEST ' + G.best + '   WAVE ' + G.bestWave : 'SINK THE ENEMY FLEET, WAVE BY WAVE';
   txt(ctx, best, view.w / 2, by + 46, '#ffe27a', { align: 'center' });
-  if (!Input.touchMode) txt(ctx, 'ENTER TO START', view.w / 2, view.h - view.safe.b - 11, 'rgba(255,255,255,0.75)', { align: 'center' });
+  if (!Input.touchMode && !IS_IOS) txt(ctx, 'ENTER TO START', view.w / 2, view.h - view.safe.b - 11, 'rgba(255,255,255,0.75)', { align: 'center' });
+  else if (CAN_INSTALL_IOS) txt(ctx, 'TIP: SHARE > ADD TO HOME SCREEN TO INSTALL', view.w / 2, view.h - view.safe.b - 11, '#9fd4f0', { align: 'center' });
 }
 
 function drawShop(ctx) {
