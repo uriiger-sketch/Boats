@@ -372,6 +372,24 @@ const Art = {
       'kwk.kwk',
       'kkk.kkk',
     ], { k: K, w: '#ffffff' });
+    this.icons.boat = spriteFromMap([
+      '...k....',
+      '..kwk...',
+      '.kwrwk..',
+      'kwwwwwk.',
+      'kkkkkkkk',
+      'kbbbbbbk',
+      '.kkkkkk.',
+    ], { k: K, w: '#f6edd6', r: '#d8433b', b: '#c99258' });
+    this.icons.boatLost = spriteFromMap([
+      '...k....',
+      '..kgk...',
+      '.kgggk..',
+      'kgggggk.',
+      'kkkkkkkk',
+      'kggggggk',
+      '.kkkkkk.',
+    ], { k: '#2a2a34', g: '#4a4a56' });
     this.icons.anchor = spriteFromMap([
       '..kkk..',
       '..kwk..',

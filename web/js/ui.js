@@ -187,6 +187,12 @@ function drawHUD(ctx) {
   const kx = L + 12 + Font.width(String(G.gold)) + 6;
   ctx.drawImage(Art.icons.keg, kx, T + 9);
   txt(ctx, '×' + G.kegCount, kx + 8, T + 10, '#ffffff');
+  // Fleet: remaining boats.
+  const bx = kx + 8 + Font.width('×' + G.kegCount) + 6;
+  for (let i = 0; i < MAX_LIVES; i++) {
+    const lostNow = i === G.lives && G.livesBump > 0 && Math.floor(G.t * 10) % 2;
+    ctx.drawImage(i < G.lives || lostNow ? Art.icons.boat : Art.icons.boatLost, bx + i * 10, T + 9);
+  }
   // Power-ups.
   let px = L;
   for (const k of ['rapid', 'fire']) {
@@ -380,7 +386,7 @@ function drawTitle(ctx) {
     drawButton(ctx, 'play', view.w / 2 - 50, by, 100, 20, 'SET SAIL!', () => { newGame(); }, { color: pulse ? '#d8433b' : '#e8564c' });
   }
   toggleRow(ctx, view.w / 2 - pw / 2, by + 26, pw, 14, 4);
-  const best = save ? 'SAVED: ' + save.gold + ' GOLD   SCORE ' + save.score : G.best ? 'BEST ' + G.best + '   WAVE ' + G.bestWave : 'SINK THE ENEMY FLEET, WAVE BY WAVE';
+  const best = save ? 'SAVED: ' + save.gold + ' GOLD   ' + (save.lives == null ? MAX_LIVES : save.lives) + ' BOATS   SCORE ' + save.score : G.best ? 'BEST ' + G.best + '   WAVE ' + G.bestWave : 'SINK THE ENEMY FLEET, WAVE BY WAVE';
   txt(ctx, best, view.w / 2, by + 46, '#ffe27a', { align: 'center' });
   if (!Input.touchMode && !IS_IOS) txt(ctx, 'ENTER TO START', view.w / 2, view.h - view.safe.b - 11, 'rgba(255,255,255,0.75)', { align: 'center' });
   else if (CAN_INSTALL_IOS) txt(ctx, 'TIP: SHARE > ADD TO HOME SCREEN TO INSTALL', view.w / 2, view.h - view.safe.b - 11, '#9fd4f0', { align: 'center' });
@@ -447,7 +453,7 @@ function drawGameOver(ctx) {
   const pin = easeOutBack(clamp(G.stateT / 0.4, 0, 1));
   const py = y + Math.round((1 - pin) * 50);
   drawPanel(ctx, x, py, w, h, 'wood');
-  txt(ctx, 'SHIP LOST!', view.w / 2, py + 10, '#ff6a5a', { align: 'center', scale: 2, shadow: '#5a1a10', shadowOff: 2 });
+  txt(ctx, 'FLEET LOST!', view.w / 2, py + 10, '#ff6a5a', { align: 'center', scale: 2, shadow: '#5a1a10', shadowOff: 2 });
   const rows = [['WAVE REACHED', G.wave], ['SHIPS SUNK', G.kills], ['GOLD PLUNDERED', G.goldEarned]];
   rows.forEach(([k, v], i) => {
     Font.draw(ctx, k, x + 16, py + 34 + i * 11, '#5a3518');

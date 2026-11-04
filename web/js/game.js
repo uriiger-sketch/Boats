@@ -42,7 +42,7 @@ const G = {
   up: { hull: 0, guns: 0, powder: 0, crew: 0, sails: 0 }, kegCount: 2,
   power: { rapid: 0, fire: 0 }, barrelT: 8, coinStep: 0, coinStepT: 0,
   gulls: [], clouds: [], boss: null, hint: null, hintStep: 0, tutorial: !Store.get('tutorialDone', false),
-  moved: 0, firedHit: false, shopPop: {}, goldBump: 0, savedT: 0,
+  moved: 0, firedHit: false, shopPop: {}, goldBump: 0, savedT: 0, lives: 3, livesBump: 0,
 };
 
 function playerStats() {
@@ -138,7 +138,7 @@ function toTitle() {
 function newGame() {
   G.score = 0; G.gold = 0; G.kills = 0; G.goldEarned = 0; G.newBest = false;
   G.up = { hull: 0, guns: 0, powder: 0, crew: 0, sails: 0 };
-  G.kegCount = 2; G.power = { rapid: 0, fire: 0 }; G.combo = 0; G.comboT = 0;
+  G.kegCount = 2; G.power = { rapid: 0, fire: 0 }; G.combo = 0; G.comboT = 0; G.lives = MAX_LIVES;
   G.hintStep = 0; G.moved = 0; G.firedHit = false;
   G.wave = 0;
   World.generate(randi(1, 1e9));
@@ -243,10 +243,11 @@ function setSail() {
 
 // --- Saved voyage: written each time the player leaves the harbor ----------
 const SAVE_VERSION = 1;
+const MAX_LIVES = 3;
 function saveRun(wave = G.wave, toast = true) {
   Store.set('run', {
     v: SAVE_VERSION, wave, score: G.score, gold: G.gold, kills: G.kills, goldEarned: G.goldEarned,
-    up: { ...G.up }, kegCount: G.kegCount, hp: Math.ceil(G.player.hp), at: Date.now(),
+    up: { ...G.up }, kegCount: G.kegCount, hp: Math.ceil(G.player.hp), lives: G.lives, at: Date.now(),
   });
   if (toast) G.savedT = 2.5;
 }
@@ -260,6 +261,7 @@ function continueGame() {
   G.score = r.score | 0; G.gold = r.gold | 0; G.kills = r.kills | 0; G.goldEarned = r.goldEarned | 0; G.newBest = false;
   G.up = { hull: 0, guns: 0, powder: 0, crew: 0, sails: 0, ...r.up };
   G.kegCount = clamp(r.kegCount | 0, 0, 5); G.power = { rapid: 0, fire: 0 }; G.combo = 0; G.comboT = 0;
+  G.lives = clamp(r.lives == null ? MAX_LIVES : r.lives | 0, 1, MAX_LIVES);
   G.tutorial = false; G.hint = null;
   World.generate(randi(1, 1e9));
   resetField();
@@ -289,6 +291,31 @@ function buyUpgrade(u) {
   Sound.fx.buy();
   haptic('success');
   return true;
+}
+
+// A fresh ship from the fleet: full hull, upgrades kept, brief invulnerability.
+function respawnPlayer() {
+  let pos = null, bestD = -1;
+  for (let i = 0; i < 40; i++) {
+    const p = World.randomWater(-0.38, null, 0, 20);
+    let nearest = 1e9;
+    for (const e of G.ships) if (e.alive) nearest = Math.min(nearest, dist(p.x, p.y, e.x, e.y));
+    if (nearest > bestD) { bestD = nearest; pos = p; }
+    if (nearest > 220) break;
+  }
+  const away = G.ships.find((e) => e.alive);
+  const a = away ? Math.atan2(pos.y - away.y, pos.x - away.x) : rand(0, PI2);
+  G.player = makeShip('player', pos.x, pos.y, a);
+  G.player.speed = G.player.d.speed * 0.5;
+  G.player.invuln = 3.5;
+  G.balls = G.balls.filter((b) => b.team === 'player');
+  G.power = { rapid: 0, fire: 0 };
+  snapCamera();
+  splash(pos.x, pos.y, true);
+  G.state = 'playing'; G.stateT = 3;
+  const last = G.lives === 1;
+  G.banner = { title: last ? 'LAST SHIP!' : 'NEW SHIP!', sub: last ? 'NO BOATS LEFT AFTER THIS ONE' : G.lives + ' BOATS LEFT IN YOUR FLEET', t: 0, dur: 2.6, boss: last };
+  Sound.fx.fanfare(); haptic('success');
 }
 
 function gameOver() {
@@ -383,6 +410,7 @@ function launchBall(p) {
 
 function damageShip(s, amount, x, y, opts = {}) {
   if (!s.alive) return;
+  if (s.invuln > 0) { sparks(x, y, 3); return; }
   amount = Math.max(1, Math.round(amount));
   s.hp -= amount;
   s.flashT = 0.09; s.hpShowT = 3;
@@ -436,7 +464,16 @@ function sinkShip(s) {
     if (G.boss === s) G.boss = null;
   } else {
     G.hitstop = 0.15; addShake(8); haptic('error');
-    Sound.fx.gameover();
+    G.lives = Math.max(0, G.lives - 1);
+    G.livesBump = 1;
+    if (G.lives > 0) {
+      Sound.fx.hurt();
+      // Record the lost boat right away so quitting cannot undo it.
+      const r = loadRun();
+      if (r) { r.lives = G.lives; Store.set('run', r); }
+    } else {
+      Sound.fx.gameover();
+    }
     G.state = 'sinking'; G.stateT = 0;
   }
 }
@@ -613,6 +650,7 @@ function updateShip(s, dt) {
   s.y += (Math.sin(s.a) * s.speed + s.ky) * dt;
   for (const k of ['-1', '1']) s.reload[k] = Math.max(0, s.reload[k] - dt);
   s.flashT = Math.max(0, s.flashT - dt);
+  if (s.invuln > 0) s.invuln -= dt;
   s.hpShowT = Math.max(0, s.hpShowT - dt);
   if (s.entering > 0) s.entering = Math.max(0, s.entering - dt * 0.5);
 
@@ -889,6 +927,7 @@ function update(dt) {
   G.hurtFlash = Math.max(0, G.hurtFlash - dt);
   G.goldBump = Math.max(0, G.goldBump - dt * 4);
   G.savedT = Math.max(0, G.savedT - dt);
+  G.livesBump = Math.max(0, G.livesBump - dt * 2);
   for (const k in G.shopPop) G.shopPop[k] = Math.max(0, G.shopPop[k] - dt * 3);
   if (G.banner) { G.banner.t += dt; if (G.banner.t > G.banner.dur) G.banner = null; }
   G.lights = G.lights.filter((l) => l.persist && (l.persist -= dt) > 0);
@@ -945,7 +984,7 @@ function update(dt) {
     if (G.stateT > 3.2 && !G.pickups.some((p) => p.k === 'coin')) openShop();
     else if (G.stateT > 6) openShop();
   } else if (G.state === 'sinking') {
-    if (G.stateT > 2.6) gameOver();
+    if (G.stateT > 2.6) { if (G.lives > 0) respawnPlayer(); else gameOver(); }
   }
 }
 
@@ -1001,6 +1040,7 @@ function drawShip(ctx, s, cx, cy) {
   ctx.drawImage(spr.shadows[fi], x, y - bob);
   const enter = s.entering;
   if (enter > 0) ctx.globalAlpha = 1 - enter * 0.7;
+  if (s.invuln > 0 && Math.floor(G.t * 12) % 2) ctx.globalAlpha = 0.35;
   ctx.drawImage(s.flashT > 0 ? spr.flashes[fi] : spr.frames[fi], x, y);
   ctx.globalAlpha = 1;
   // Pennant on the main mast streaming downwind.

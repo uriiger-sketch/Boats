@@ -31,7 +31,7 @@ launches full screen in landscape, and works offline (service worker). Android C
 - **Pickups**: gold coins from sunk ships, floating repair barrels, and RAPID FIRE / FIRE SHOT crates.
 - **Waves**: each wave brings a new archipelago and a new time of day (day, golden hour, sunset, night, dawn). Every 5th wave is a boss fight against the Crimson Galleon, whose mortar volleys you dodge by watching for the red target rings.
 - **Harbor**: between waves, upgrade Hull, Cannons, Powder, Gun Crew and Sails, or buy repairs.
-- **Saving**: your voyage is saved when you reach the harbor and again when you tap **SAVE + SAIL** after shopping. The title screen offers **CONTINUE** to resume at that wave with your gold, upgrades, hull and kegs. Losing your ship ends the voyage and clears the save.
+- **Saving**: your voyage is saved when you reach the harbor and again when you tap **SAVE + SAIL** after shopping. The title screen offers **CONTINUE** to resume at that wave with your gold, upgrades, hull and kegs. Each voyage has a fleet of **3 boats**: when one sinks, a fresh ship (full hull, upgrades kept, a few seconds of invulnerability) joins the same wave. The voyage, and the save, end only when all 3 are lost.
 - Keyboard: WASD/arrows to steer, Space to fire, Q/E for port/starboard, K for a keg, P to pause. Gamepads work too.
 
 All art is generated in code (per-pixel ship sprites for 32 headings, dithered water, islands, foam),
