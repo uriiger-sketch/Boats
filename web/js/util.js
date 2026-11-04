@@ -100,6 +100,7 @@ const Store = {
     try { const v = localStorage.getItem('bod_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; }
   },
   set(k, v) { try { localStorage.setItem('bod_' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+  del(k) { try { localStorage.removeItem('bod_' + k); } catch (e) { /* storage unavailable */ } },
 };
 
 const Settings = {

@@ -42,7 +42,7 @@ const G = {
   up: { hull: 0, guns: 0, powder: 0, crew: 0, sails: 0 }, kegCount: 2,
   power: { rapid: 0, fire: 0 }, barrelT: 8, coinStep: 0, coinStepT: 0,
   gulls: [], clouds: [], boss: null, hint: null, hintStep: 0, tutorial: !Store.get('tutorialDone', false),
-  moved: 0, firedHit: false, shopPop: {}, goldBump: 0,
+  moved: 0, firedHit: false, shopPop: {}, goldBump: 0, savedT: 0,
 };
 
 function playerStats() {
@@ -227,7 +227,7 @@ function waveCleared() {
   if (G.tutorial) { G.tutorial = false; Store.set('tutorialDone', true); G.hint = null; }
 }
 
-function openShop() { G.state = 'shop'; G.stateT = 0; G.shopPop = {}; }
+function openShop() { G.state = 'shop'; G.stateT = 0; G.shopPop = {}; saveRun(G.wave + 1, false); }
 
 function setSail() {
   const hp = G.player.hp;
@@ -238,6 +238,36 @@ function setSail() {
   initAmbience();
   snapCamera();
   startWave(G.wave + 1);
+  saveRun();
+}
+
+// --- Saved voyage: written each time the player leaves the harbor ----------
+const SAVE_VERSION = 1;
+function saveRun(wave = G.wave, toast = true) {
+  Store.set('run', {
+    v: SAVE_VERSION, wave, score: G.score, gold: G.gold, kills: G.kills, goldEarned: G.goldEarned,
+    up: { ...G.up }, kegCount: G.kegCount, hp: Math.ceil(G.player.hp), at: Date.now(),
+  });
+  if (toast) G.savedT = 2.5;
+}
+function loadRun() {
+  const r = Store.get('run', null);
+  return r && r.v === SAVE_VERSION && r.wave >= 1 ? r : null;
+}
+function continueGame() {
+  const r = loadRun();
+  if (!r) { newGame(); return; }
+  G.score = r.score | 0; G.gold = r.gold | 0; G.kills = r.kills | 0; G.goldEarned = r.goldEarned | 0; G.newBest = false;
+  G.up = { hull: 0, guns: 0, powder: 0, crew: 0, sails: 0, ...r.up };
+  G.kegCount = clamp(r.kegCount | 0, 0, 5); G.power = { rapid: 0, fire: 0 }; G.combo = 0; G.comboT = 0;
+  G.tutorial = false; G.hint = null;
+  World.generate(randi(1, 1e9));
+  resetField();
+  G.player = makeShip('player', World.W / 2, World.H / 2, rand(0, PI2));
+  G.player.hp = clamp(r.hp || G.player.maxHp, 1, G.player.maxHp);
+  initAmbience();
+  snapCamera();
+  startWave(r.wave);
 }
 
 function buyUpgrade(u) {
@@ -263,6 +293,7 @@ function buyUpgrade(u) {
 
 function gameOver() {
   G.state = 'gameover'; G.stateT = 0;
+  Store.del('run');
   if (G.score > G.best) { G.best = G.score; G.newBest = true; Store.set('best', G.best); }
   if (G.wave > G.bestWave) { G.bestWave = G.wave; Store.set('bestWave', G.bestWave); }
 }
@@ -857,6 +888,7 @@ function update(dt) {
   G.shake = Math.max(0, G.shake - dt * 18);
   G.hurtFlash = Math.max(0, G.hurtFlash - dt);
   G.goldBump = Math.max(0, G.goldBump - dt * 4);
+  G.savedT = Math.max(0, G.savedT - dt);
   for (const k in G.shopPop) G.shopPop[k] = Math.max(0, G.shopPop[k] - dt * 3);
   if (G.banner) { G.banner.t += dt; if (G.banner.t > G.banner.dur) G.banner = null; }
   G.lights = G.lights.filter((l) => l.persist && (l.persist -= dt) > 0);
