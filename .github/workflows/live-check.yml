@@ -1,0 +1,64 @@
+name: Live site check
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * *"
+  push:
+    branches: [ "main" ]
+    paths: [ "web/**", "Dockerfile", "Caddyfile", "railway.json" ]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      URL: https://web-production-a91e2.up.railway.app
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for Railway to finish deploying this commit
+        if: github.event_name == 'push'
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "$URL/sw.js" | grep -q "broadside-v"; then
+              sed -n "s/^const CACHE = '\(.*\)';/\1/p" web/sw.js > want
+              curl -fsS "$URL/sw.js" | grep -q "$(cat want)" && exit 0
+            fi
+            sleep 20
+          done
+          echo "::warning::deployed sw.js does not match this commit yet"
+      - name: Check pages and assets
+        run: |
+          set -e
+          code() { curl -s -o /dev/null -w "%{http_code}" "$URL$1"; }
+          for p in / /index.html /js/game.js /js/main.js /sw.js /manifest.webmanifest /icon-512.png /apple-touch-icon.png; do
+            c=$(code "$p"); echo "$p -> $c"; [ "$c" = "200" ]
+          done
+          curl -fsS "$URL/" | grep -q "<title>Broadside of the Deep</title>"
+          curl -fsSI "$URL/manifest.webmanifest" | grep -qi "content-type: application/manifest+json"
+      - name: Play it in a real browser
+        run: |
+          npm i --no-save --silent playwright@1.48.2
+          npx playwright install --with-deps chromium >/dev/null
+          cat > check.js <<'JS'
+          const { chromium } = require('playwright');
+          (async () => {
+            const b = await chromium.launch();
+            const p = await b.newPage({ viewport: { width: 852, height: 393 }, deviceScaleFactor: 2 });
+            const errs = [];
+            p.on('pageerror', (e) => errs.push(e.message));
+            await p.goto(process.env.URL, { waitUntil: 'load' });
+            await p.waitForTimeout(1500);
+            const s = await p.evaluate(() => { newGame(); return new Promise((r) => setTimeout(() => r({ state: G.state, wave: G.wave, ships: G.ships.length }), 4000)); });
+            console.log(JSON.stringify(s));
+            await p.screenshot({ path: 'live.png' });
+            await b.close();
+            if (errs.length || s.state !== 'playing') { console.error(errs); process.exit(1); }
+          })();
+          JS
+          node check.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-screenshot
+          path: live.png
+          if-no-files-found: ignore
