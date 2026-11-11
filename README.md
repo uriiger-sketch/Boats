@@ -29,8 +29,15 @@ launches full screen in landscape, and works offline (service worker). Android C
 - **Fire**: hold the FIRE button (or anywhere on the right half). Cannons fire from whichever side has an enemy in its arc. Aim assist leads the target, and a dotted arc plus a reticle show when a shot is lined up. The ring around FIRE shows reload for port (left half) and starboard (right half).
 - **Powder kegs**: tap the blue keg button to drop a mine behind you.
 - **Pickups**: gold coins from sunk ships, floating repair barrels, and RAPID FIRE / FIRE SHOT crates.
-- **Waves**: each wave brings a new archipelago and a new time of day (day, golden hour, sunset, night, dawn). Every 5th wave is a boss fight against the Crimson Galleon, whose mortar volleys you dodge by watching for the red target rings.
-- **Harbor**: between waves, upgrade Hull, Cannons, Powder, Gun Crew and Sails, or buy repairs.
+- **Campaign**: four seas of five waves, each with a new threat and its own boss, then endless voyages that keep getting harder.
+  1. *The Shallows*: sloops, brigs and fire ships; boss: **Crimson Galleon** (mortar volleys).
+  2. *Smugglers' Reach*: fast **corsairs**, **fog**, long-range **bomb ketches**; boss: **Iron Leviathan** (armored, mortar rings).
+  3. *Stormwater*: **storms** (rain, lightning, strong wind) and **ironclads** (armor, so powder kegs pierce it); boss: **Ghost Galleon** (vanishes and reappears behind you).
+  4. *The Abyss*: everything at once; boss: **Admiral's Flagship** (launches fire ships, becomes enraged at half hull).
+- **Treasure convoys** (waves 3, 8, 13, 18): merchants flee and escape when their blue timer runs out. Sink every one for a bonus boat.
+- **Extra boats**: +1 for each boss defeated, +1 for each fully plundered convoy, or buy one from the **Shipwright** in the harbor. Up to 9 boats.
+- Time of day still changes from wave to wave, and bosses arrive at night.
+- **Harbor**: between waves, upgrade Hull, Cannons, Powder, Gun Crew and Sails, buy repairs, kegs or a new boat, and see what the next wave brings.
 - **Saving**: your voyage is saved when you reach the harbor and again when you tap **SAVE + SAIL** after shopping. The title screen offers **CONTINUE** to resume at that wave with your gold, upgrades, hull and kegs. Each voyage has a fleet of **3 boats**: when one sinks, a fresh ship (full hull, upgrades kept, a few seconds of invulnerability) joins the same wave. The voyage, and the save, end only when all 3 are lost.
 - Keyboard: WASD/arrows to steer, Space to fire, Q/E for port/starboard, K for a keg, P to pause. Gamepads work too.
 
