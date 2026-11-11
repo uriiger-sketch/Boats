@@ -144,6 +144,10 @@ const Sound = (() => {
       tone({ type: 'sawtooth', f0: 98, vol: 0.25, attack: 0.2, decay: 1.4, lp: 600 });
       tone({ type: 'sawtooth', f0: 147, vol: 0.18, attack: 0.25, decay: 1.3, lp: 700, delay: 0.05 });
     },
+    thunder() {
+      noise({ type: 'lowpass', f0: 900, f1: 60, vol: 0.9, attack: 0.03, decay: 2.4, delay: rand(0.2, 0.6), rate: 0.6 });
+      noise({ type: 'lowpass', f0: 300, f1: 40, vol: 0.7, attack: 0.3, decay: 2.0, delay: 0.5, rate: 0.5 });
+    },
     whistle() { tone({ type: 'sine', f0: 1400, f1: 500, vol: 0.06, attack: 0.05, decay: 0.6 }); },
   };
 

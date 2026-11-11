@@ -132,10 +132,19 @@ function drawAim(ctx, cam) {
 
 function drawShipBars(ctx, cam) {
   for (const s of G.ships) {
-    if (!s.alive || s.d.boss || (s.hpShowT <= 0 && s.hp >= s.maxHp)) continue;
+    if (!s.alive || s.d.boss || (s.hpShowT <= 0 && s.hp >= s.maxHp && !s.escapeMax)) continue;
     const w = Math.round(s.art.len * 0.8);
     const x = Math.round(s.x - cam.cx - w / 2), y = Math.round(s.y - cam.cy - s.art.len * 0.5 - 6);
     drawBar(ctx, x, y, w, 2, s.hp / s.maxHp, s.hp / s.maxHp > 0.35 ? '#ff6a4a' : '#ff3a2a');
+  }
+  // Merchants show how long until they slip away.
+  for (const s of G.ships) {
+    if (!s.alive || !s.escapeMax) continue;
+    const w = Math.round(s.art.len * 0.8);
+    const x = Math.round(s.x - cam.cx - w / 2), y = Math.round(s.y - cam.cy - s.art.len * 0.5 - 2);
+    const f = s.escapeT / s.escapeMax;
+    if (f < 0.3 && Math.floor(G.t * 6) % 2) continue;
+    drawBar(ctx, x, y, w, 1, f, f < 0.3 ? '#ff8a3a' : '#5ab8ff');
   }
 }
 
@@ -162,7 +171,7 @@ function drawArrows(ctx) {
     const pulse = Math.floor(G.t * 4) % 2;
     const sz = (s.d.boss ? 7 : 5) + pulse;
     const ca = Math.cos(a), sa = Math.sin(a);
-    const col = s.d.boss ? '#ffd23f' : s.kind === 'burner' ? '#ff9a3a' : '#ff4a4a';
+    const col = s.d.boss ? '#ffd23f' : s.kind === 'merchant' ? '#7dff9a' : s.kind === 'burner' ? '#ff9a3a' : '#ff4a4a';
     pixTri(ctx, x + ca * sz + ca, y + sa * sz + sa, x - sa * sz * 0.7 - ca * 2, y + ca * sz * 0.7 - sa * 2, x + sa * sz * 0.7 - ca * 2, y - ca * sz * 0.7 - sa * 2, INK);
     pixTri(ctx, x + ca * sz, y + sa * sz, x - sa * sz * 0.6 - ca, y + ca * sz * 0.6 - sa, x + sa * sz * 0.6 - ca, y - ca * sz * 0.6 - sa, col);
   }
@@ -189,9 +198,16 @@ function drawHUD(ctx) {
   txt(ctx, '×' + G.kegCount, kx + 8, T + 10, '#ffffff');
   // Fleet: remaining boats.
   const bx = kx + 8 + Font.width('×' + G.kegCount) + 6;
-  for (let i = 0; i < MAX_LIVES; i++) {
-    const lostNow = i === G.lives && G.livesBump > 0 && Math.floor(G.t * 10) % 2;
-    ctx.drawImage(i < G.lives || lostNow ? Art.icons.boat : Art.icons.boatLost, bx + i * 10, T + 9);
+  const gain = G.livesBump > 0 && Math.floor(G.t * 10) % 2;
+  if (G.lives > 5) {
+    ctx.drawImage(Art.icons.boat, bx, T + 9);
+    txt(ctx, '×' + G.lives, bx + 10, T + 10, gain ? '#7dff9a' : '#ffffff');
+  } else {
+    for (let i = 0; i < Math.max(MAX_LIVES, G.lives); i++) {
+      const lostNow = i === G.lives && G.livesBump > 0 && Math.floor(G.t * 10) % 2;
+      const yy = T + 9 - (gain && i === G.lives - 1 ? 1 : 0);
+      ctx.drawImage(i < G.lives || lostNow ? Art.icons.boat : Art.icons.boatLost, bx + i * 10, yy);
+    }
   }
   // Power-ups.
   let px = L;
@@ -233,9 +249,16 @@ function drawHUD(ctx) {
     ctx.drawImage(Art.icons.anchor, cx - Math.round(w / 2) + 5, y - 1);
     txt(ctx, label, cx + 5, y, '#7dff9a', { align: 'center' });
   }
+  // Treasure convoy tracker.
+  if (G.convoy && (G.state === 'playing' || G.state === 'sinking')) {
+    const c = G.convoy;
+    const done = c.sunk + c.escaped >= c.total;
+    const label = 'MERCHANTS ' + c.sunk + '/' + c.total + (c.escaped ? '  ESCAPED ' + c.escaped : done ? '' : '  BONUS BOAT!');
+    txt(ctx, label, cx, T + 19, c.escaped ? '#ff8a7a' : '#7dff9a', { align: 'center' });
+  }
   // Combo.
   if (G.combo >= 2 && G.comboT > 0) {
-    const y = T + (G.boss && G.boss.alive ? 38 : 20);
+    const y = T + (G.boss && G.boss.alive ? 38 : G.convoy ? 29 : 20);
     txt(ctx, G.combo + '× COMBO', cx, y, Math.floor(G.t * 8) % 2 ? '#ffd23f' : '#ffffff', { align: 'center' });
     drawBar(ctx, cx - 18, y + 9, 36, 1, G.comboT / 4.5, '#ffd23f');
   }
@@ -400,15 +423,16 @@ function drawShop(ctx) {
   const py = y + Math.round((1 - pin) * 40);
   drawPanel(ctx, x, py, w, h, 'wood');
   txt(ctx, 'HARBOR', x + 10, py + 9, '#ffd23f', { scale: 2, shadow: '#5a1a10', shadowOff: 2 });
-  Font.draw(ctx, 'WAVE ' + G.wave + ' CLEARED - SPEND YOUR PLUNDER', x + 10, py + 27, '#5a3518');
+  Font.draw(ctx, wavePreview(G.wave + 1, w - 20), x + 10, py + 27, '#5a3518');
   ctx.drawImage(Art.icons.coin, x + w - 14 - Font.width(String(G.gold), 2) - 10, py + 11);
   txt(ctx, G.gold, x + w - 12, py + 9, '#ffd23f', { align: 'right', scale: 2 });
 
-  const cols = w >= 330 ? 3 : 2;
+  const cols = w >= 300 ? 4 : 2;
   const rows = Math.ceil(UPGRADES.length / cols);
   const gap = 4, top = py + 38, bottom = py + h - 30;
   const cw = Math.floor((w - 16 - gap * (cols - 1)) / cols);
   const ch = Math.min(50, Math.floor((bottom - top - gap * (rows - 1)) / rows));
+  const compact = ch < 34;
   UPGRADES.forEach((u, i) => {
     const c = i % cols, r = Math.floor(i / cols);
     const cx = x + 8 + c * (cw + gap);
@@ -417,13 +441,24 @@ function drawShop(ctx) {
     const maxed = !u.repeat && lvl >= u.max;
     const cost = u.cost(lvl);
     const afford = G.gold >= cost;
-    const full = u.id === 'repair' && G.player.hp >= playerStats().maxHp && G.kegCount >= 5;
+    const full = upgradeFull(u);
     uiButton('u_' + u.id, cx, cy, cw, ch, () => buyUpgrade(u));
     const pressed = UI.pressed === 'u_' + u.id;
     drawPanel(ctx, cx, cy + (pressed ? 1 : 0), cw, ch, 'card');
     const oy = cy + (pressed ? 1 : 0);
-    ctx.drawImage(Art.icons[u.icon], cx + 5, oy + 5, Art.icons[u.icon].width * 2, Art.icons[u.icon].height * 2);
-    const tx = cx + 23;
+    const icon = Art.icons[u.icon];
+    const label = maxed ? 'MAX' : full ? 'FULL' : String(cost);
+    const col = maxed || full ? '#9adfa0' : afford ? '#ffd23f' : '#ff6a5a';
+    const lw = Font.width(label);
+    if (compact) {
+      const my = oy + Math.floor((ch - 7) / 2);
+      ctx.drawImage(icon, cx + 4, oy + Math.floor((ch - icon.height) / 2));
+      txt(ctx, u.name, cx + 14, my, '#ffffff');
+      txt(ctx, label, cx + cw - 4, my, col, { align: 'right' });
+      return;
+    }
+    ctx.drawImage(icon, cx + 4, oy + 4);
+    const tx = cx + 14;
     txt(ctx, u.name, tx, oy + 4, '#ffffff');
     Font.draw(ctx, u.desc, tx, oy + 13, '#f0deb0');
     if (!u.repeat) {
@@ -431,18 +466,19 @@ function drawShop(ctx) {
         ctx.fillStyle = INK; ctx.fillRect(tx + p * 5, oy + 23, 4, 4);
         ctx.fillStyle = p < lvl ? '#ffd23f' : '#4a2a18'; ctx.fillRect(tx + p * 5 + 1, oy + 24, 2, 2);
       }
+    } else if (u.id === 'repair') {
+      drawBar(ctx, tx, oy + 24, Math.min(36, cw - 24), 2, G.player.hp / playerStats().maxHp, '#5dd36a');
     } else {
-      const ps = playerStats();
-      drawBar(ctx, tx, oy + 24, Math.min(40, cw - 60), 2, G.player.hp / ps.maxHp, '#5dd36a');
+      Font.draw(ctx, u.id === 'kegs' ? G.kegCount + '/5' : G.lives + '/' + LIFE_CAP, tx, oy + 22, '#f0deb0');
     }
-    const label = maxed ? 'MAX' : full ? 'FULL' : String(cost);
-    const col = maxed || full ? '#9adfa0' : afford ? '#ffd23f' : '#ff6a5a';
-    const lw = Font.width(label);
-    txt(ctx, label, cx + cw - 5, oy + ch - 12, col, { align: 'right' });
-    if (!maxed && !full) ctx.drawImage(Art.icons.coin, cx + cw - 5 - lw - 8, oy + ch - 12);
+    txt(ctx, label, cx + cw - 4, oy + ch - 11, col, { align: 'right' });
+    if (!maxed && !full) ctx.drawImage(Art.icons.coin, cx + cw - 4 - lw - 8, oy + ch - 11);
   });
   const ps = playerStats();
-  Font.draw(ctx, 'HULL ' + Math.ceil(G.player.hp) + '/' + ps.maxHp + '   GUNS ' + ps.guns + '   KEGS ' + G.kegCount, x + 10, py + h - 20, '#5a3518');
+  const stats = ['HULL ' + Math.ceil(G.player.hp) + '/' + ps.maxHp + '  GUNS ' + ps.guns + '  KEGS ' + G.kegCount + '  BOATS ' + G.lives,
+    'HULL ' + Math.ceil(G.player.hp) + '/' + ps.maxHp + '  BOATS ' + G.lives, 'BOATS ' + G.lives];
+  const room = w - 96 - 16;
+  Font.draw(ctx, stats.find((t) => Font.width(t) <= room) || stats[2], x + 10, py + h - 20, '#5a3518');
   drawButton(ctx, 'sail', x + w - 96, py + h - 25, 86, 18, 'SAVE + SAIL >', setSail, { color: '#4a9a3a' });
 }
 
