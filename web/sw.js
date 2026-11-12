@@ -1,7 +1,7 @@
 'use strict';
 // Offline support for the installed web app: precache everything, then
 // serve from cache and refresh in the background (stale-while-revalidate).
-const CACHE = 'broadside-v5';
+const CACHE = 'broadside-v6';
 const ASSETS = [
   './', 'index.html', 'manifest.webmanifest', 'icon.png', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
   'js/util.js', 'js/font.js', 'js/audio.js', 'js/art.js', 'js/world.js', 'js/input.js', 'js/game.js', 'js/campaign.js', 'js/ui.js', 'js/main.js',

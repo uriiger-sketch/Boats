@@ -35,7 +35,11 @@ launches full screen in landscape, and works offline (service worker). Android C
   3. *Stormwater*: **storms** (rain, lightning, strong wind) and **ironclads** (armor, so powder kegs pierce it); boss: **Ghost Galleon** (vanishes and reappears behind you).
   4. *The Abyss*: everything at once; boss: **Admiral's Flagship** (launches fire ships, becomes enraged at half hull).
 - **Treasure convoys** (waves 3, 8, 13, 18): merchants flee and escape when their blue timer runs out. Sink every one for a bonus boat.
-- **Extra boats**: +1 for each boss defeated, +1 for each fully plundered convoy, or buy one from the **Shipwright** in the harbor. Up to 9 boats.
+- **Extra boats**: +1 for each boss defeated, +1 for each fully plundered convoy, or buy one from the **Shipwright** in the harbor (the price climbs with each purchase). Up to 6 boats.
+- **Shipyard (from wave 16)**: two refits that physically enlarge your ship. **Lengthen Hull** adds a gun per side and a mast; **Widen Beam** adds armor and hull but turns slower. A bigger ship is also a bigger target.
+- **From wave 15 the fleets grow and the captains get smarter**, more so every wave: they hold stations off your bow and stern where your broadsides can't reach, swerve away from incoming fire, aim at where your turning ship will be, and more ships take the water at once.
+- **New enemies**: **cutters**, faster than you, strike from astern and sprint away; rare **shadow ships** flare, then charge straight through you as phantoms, and can only be hurt for a moment after each pass.
+- **No autopilot wins**: hard turns bleed speed, so endless tight circles make you slow and predictable, and smart crews dodge blind, constant broadsides. Time your shots, close in, use kegs.
 - Time of day still changes from wave to wave, and bosses arrive at night.
 - **Harbor**: between waves, upgrade Hull, Cannons, Powder, Gun Crew and Sails, buy repairs, kegs or a new boat, and see what the next wave brings.
 - **Saving**: your voyage is saved when you reach the harbor and again when you tap **SAVE + SAIL** after shopping. The title screen offers **CONTINUE** to resume at that wave with your gold, upgrades, hull and kegs. Each voyage has a fleet of **3 boats**: when one sinks, a fresh ship (full hull, upgrades kept, a few seconds of invulnerability) joins the same wave. The voyage, and the save, end only when all 3 are lost.

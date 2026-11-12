@@ -5,9 +5,17 @@
 // Bonus boats: defeat a boss, or sink every merchant of a treasure convoy.
 // ---------------------------------------------------------------------------
 
-const LIFE_CAP = 9;
+const LIFE_CAP = 6;
 
 Object.assign(SHIP_ART, {
+  cutter: {
+    len: 17, beam: 6, masts: [0.05], span: [1.3], guns: 1,
+    pal: { trim: '#e8eef4', hull: '#2a6a8a', deck1: '#b08c60', deck2: '#9c7a52', qdeck: '#bc9868', sail: '#f4f6f8', stripe: '#2aa8c8', yard: '#1a3a4a', lantern: '#9affff', outline: '#06141c' },
+  },
+  shadow: {
+    len: 24, beam: 8, masts: [0.12, -0.28], span: [1.0, 0.9], guns: 0,
+    pal: { trim: '#7a3aff', hull: '#1a1024', deck1: '#2e2040', deck2: '#261a36', qdeck: '#382850', sail: '#2a1a3a', stripe: '#5a2aaa', yard: '#0c0614', lantern: '#c08aff', outline: '#05020a' },
+  },
   corsair: {
     len: 20, beam: 7, masts: [0.18, -0.25], span: [1.0, 1.08], guns: 2,
     pal: { trim: '#c23a3a', hull: '#1c1c24', deck1: '#6a5040', deck2: '#5a4436', qdeck: '#7a5a46', sail: '#2e2a34', stripe: '#c23a3a', yard: '#120c0c', lantern: '#ff6a4a', outline: '#08060a' },
@@ -42,6 +50,8 @@ SHIP_TYPES.galleon.mortar = { cd: 7.5, n: 3, dmg: 11, spread: 22 };
 SHIP_TYPES.galleon.flag = '#f0c04a';
 SHIP_TYPES.brig.flag = '#4a8aff';
 Object.assign(SHIP_TYPES, {
+  cutter: { art: 'cutter', name: 'CUTTER', hp: 26, speed: 64, accel: 44, turn: 2.5, guns: 1, dmg: 8, reload: 2.0, range: 105, gold: 7, score: 360, aimErr: 0.06, ai: 'raider', flag: '#2aa8c8' },
+  shadow: { art: 'shadow', name: 'SHADOW SHIP', hp: 70, speed: 30, accel: 30, turn: 2.0, guns: 0, dmg: 0, reload: 99, range: 0, gold: 30, score: 1500, ai: 'shadow', ram: 20, ghostly: true, flag: '#7a3aff' },
   corsair: { art: 'corsair', name: 'CORSAIR', hp: 42, speed: 46, accel: 30, turn: 2.2, guns: 2, dmg: 8, reload: 2.3, range: 118, gold: 8, score: 320, aimErr: 0.07, ai: 'skirmish', flag: '#c23a3a' },
   ketch: { art: 'ketch', name: 'BOMB KETCH', hp: 60, speed: 25, accel: 12, turn: 1.0, guns: 1, dmg: 7, reload: 3.4, range: 115, gold: 10, score: 380, aimErr: 0.09, ai: 'artillery', mortar: { cd: 5.5, n: 2, dmg: 12, spread: 18 }, flag: '#e0a030' },
   ironclad: { art: 'ironclad', name: 'IRONCLAD', hp: 160, armor: 0.45, speed: 23, accel: 10, turn: 0.9, guns: 3, dmg: 11, reload: 3.3, range: 140, gold: 16, score: 650, aimErr: 0.065, flag: '#8a9098' },
@@ -80,17 +90,17 @@ const SEAS = [
       { mod: 'storm', list: ['ironclad', 'brig', 'brig', 'corsair'], sub: 'NEW: IRONCLADS - POWDER KEGS PIERCE ARMOR' },
       { list: ['frigate', 'ketch', 'ketch', 'corsair', 'burner', 'burner'], sub: 'CROSSFIRE' },
       { mod: 'storm', convoy: true, list: [M, M, M, M, 'ironclad', 'corsair', 'corsair'], title: 'STORM CONVOY', sub: 'SINK EVERY MERCHANT FOR A BONUS BOAT' },
-      { mod: 'fog', list: ['ironclad', 'frigate', 'corsair', 'corsair', 'ketch', 'burner'], sub: 'GHOSTS IN THE FOG' },
+      { mod: 'fog', list: ['ironclad', 'cutter', 'cutter', 'corsair', 'ketch', 'burner'], sub: 'NEW: CUTTERS - FASTER THAN YOU' },
       { boss: 'ghost', list: ['ghost', 'corsair', 'corsair', 'burner'] },
     ],
   },
   {
     name: 'THE ABYSS',
     waves: [
-      { list: ['ironclad', 'ironclad', 'ketch', 'corsair', 'corsair', 'burner'], sub: 'THE ADMIRAL SENDS HIS BEST' },
-      { mod: 'storm', list: ['frigate', 'frigate', 'ketch', 'ketch', 'corsair', 'burner', 'burner'], sub: 'THE TEMPEST' },
+      { list: ['ironclad', 'ironclad', 'ketch', 'cutter', 'cutter', 'corsair', 'burner'], sub: 'THE ADMIRAL SENDS HIS BEST - SHIPYARD OPEN' },
+      { mod: 'storm', list: ['frigate', 'frigate', 'ketch', 'ketch', 'cutter', 'corsair', 'burner', 'burner'], sub: 'THE TEMPEST' },
       { mod: 'fog', convoy: true, list: [M, M, M, M, M, 'ironclad', 'frigate', 'corsair'], title: 'GOLD FLEET', sub: 'SINK EVERY MERCHANT FOR A BONUS BOAT' },
-      { list: ['ironclad', 'ironclad', 'frigate', 'ketch', 'ketch', 'corsair', 'corsair', 'burner'], sub: 'THE LAST LINE' },
+      { list: ['ironclad', 'ironclad', 'frigate', 'ketch', 'ketch', 'cutter', 'cutter', 'corsair', 'shadow'], sub: 'THE LAST LINE - A SHADOW STIRS' },
       { boss: 'flagship', list: ['flagship', 'ironclad', 'corsair', 'burner'] },
     ],
   },
@@ -113,7 +123,7 @@ function difficulty(n) {
   const w = Math.max(1, n);
   // Smooth growth that keeps rising through endless voyages; the sea plan adds the rhythm.
   const e = w - 1, loop = Math.floor(e / PLAN_LEN);
-  return { hp: 1 + 0.03 * e + 0.0016 * e * e, dmg: 1 + 0.02 * e + 0.001 * e * e, aim: Math.max(0.4, 1 - 0.02 * e), loop };
+  return { hp: 1 + 0.03 * e + 0.0016 * e * e, dmg: 1 + 0.02 * e + 0.0014 * e * e, aim: Math.max(0.4, 1 - 0.02 * e), loop };
 }
 
 function waveRoster(n) {
@@ -124,8 +134,16 @@ function waveRoster(n) {
     // Endless voyages: tougher crews, more ships, unpredictable weather.
     list = list.map((k) => (k === 'sloop' ? 'corsair' : k === 'brig' && Math.random() < 0.6 ? 'frigate' : k === 'frigate' && Math.random() < 0.3 ? 'ironclad' : k));
     const extra = 2 + Math.ceil(list.length * 0.3 * loop);
-    for (let i = 0; i < extra; i++) list.push(pick(['corsair', 'frigate', 'ketch', 'ironclad', 'burner']));
+    for (let i = 0; i < extra; i++) list.push(pick(['corsair', 'cutter', 'frigate', 'ketch', 'ironclad', 'burner']));
     if (!mod && !entry.boss && Math.random() < 0.4) mod = pick(['fog', 'storm']);
+  }
+  // From wave 15 the fleets swell, wave after wave.
+  if (n >= 15) {
+    const extra = Math.min(10, 1 + Math.floor((n - 15) / 2));
+    const pool = ['cutter', 'cutter', 'corsair', 'corsair', 'frigate', 'ketch', 'ironclad', 'burner'];
+    for (let i = 0; i < extra; i++) list.push(pick(pool));
+    if (n >= 16 && !list.includes('shadow') && Math.random() < Math.min(0.6, 0.18 + (n - 16) * 0.035)) list.push('shadow');
+    if (n >= 24 && Math.random() < 0.3) list.push('shadow');
   }
   // A lost boat last wave earns a slightly gentler next one.
   if (G.ease) {
@@ -140,6 +158,8 @@ function waveRoster(n) {
   if (loop > 0 && !seaStart) sub = 'ENDLESS ' + (loop + 1) + ' - ' + sub;
   return {
     list, title, sub, mod, boss: !!entry.boss, convoy: merchants > 0 ? merchants : 0,
+    smart: n >= 15 ? Math.min(1, 0.3 + (n - 15) * 0.07) : 0,
+    maxAlive: n >= 15 ? Math.min(11, 5 + Math.floor((n - 15) / 2)) : 99,
     burst: merchants ? merchants + 1 : Math.min(list.length, 1 + Math.floor(Math.min(n, 20) / 4)),
   };
 }
@@ -177,7 +197,8 @@ function fireMortar(s, cfg) {
   const dm = difficulty(G.wave).dmg;
   for (let i = 0; i < cfg.n; i++) {
     const T = 1.6 + i * 0.16;
-    let tx = P.x + Math.cos(P.a) * P.speed * T, ty = P.y + Math.sin(P.a) * P.speed * T;
+    const q = predictPos(P, T);
+    let tx = q.x, ty = q.y;
     if (cfg.n >= 5) { const a = (i / cfg.n) * PI2; tx += Math.cos(a) * cfg.spread; ty += Math.sin(a) * cfg.spread; }
     else { tx += rand(-cfg.spread, cfg.spread); ty += rand(-cfg.spread, cfg.spread); }
     G.balls.push({ x: s.x, y: s.y, z: 6, vx: (tx - s.x) / T, vy: (ty - s.y) / T, vz: (GRAV * T) / 2, team: 'enemy', dmg: cfg.dmg * dm, shell: true, tx, ty, T, owner: s, t: 0 });
@@ -300,5 +321,149 @@ function drawWeatherOver(ctx) {
   if (G.flashT > 0) {
     ctx.fillStyle = `rgba(235,240,255,${clamp(G.flashT * 4, 0, 0.6)})`;
     ctx.fillRect(0, 0, view.w, view.h);
+  }
+}
+
+// --- Late-game tactics -------------------------------------------------------------
+// Where a ship will be after T seconds, following its current turn (not a straight line).
+function predictPos(t, T) {
+  const v = t.speed, a = t.a, w = clamp(t.omega || 0, -2.5, 2.5);
+  if (Math.abs(w) < 0.06) return { x: t.x + Math.cos(a) * v * T + t.kx * T * 0.5, y: t.y + Math.sin(a) * v * T + t.ky * T * 0.5 };
+  return {
+    x: t.x + (v / w) * (Math.sin(a + w * T) - Math.sin(a)),
+    y: t.y - (v / w) * (Math.cos(a + w * T) - Math.cos(a)),
+  };
+}
+
+// Smart captains hold stations off the player's bow and stern quarters, where
+// broadsides cannot reach, and swing in only to present their own guns.
+const SMART_SLOTS = [0.45, -0.45, PI - 0.5, PI + 0.5, 1.15, -1.15, PI - 1.15, PI + 1.15, 0.2, PI];
+function assignSmart(s) {
+  if (!G.smart || s.d.boss || ['merchant', 'burner', 'shadow', 'cutter'].includes(s.kind)) return;
+  if (Math.random() > G.smart + 0.15) return;
+  s.smart = true;
+  s.slot = SMART_SLOTS[(G.slotN = (G.slotN || 0) + 1) % SMART_SLOTS.length];
+}
+
+function smartSteer(s, P, d, phi) {
+  const R = s.d.range * 0.72;
+  const qa = P.a + s.slot;
+  const qx = P.x + Math.cos(qa) * R, qy = P.y + Math.sin(qa) * R;
+  const dq = dist(s.x, s.y, qx, qy);
+  // Is the player's loaded broadside pointed at us? Then stay out of it.
+  const rel = Math.abs(angDiff(P.a, Math.atan2(s.y - P.y, s.x - P.x)));
+  const inArc = rel > 0.9 && rel < PI - 0.9 && d < playerStats().range;
+  const side = angDiff(P.a, Math.atan2(s.y - P.y, s.x - P.x)) > 0 ? '1' : '-1';
+  const loaded = P.reload[side] <= 0.15;
+  if (dq > 34 || (inArc && loaded)) {
+    s.targetA = Math.atan2(qy - s.y, qx - s.x);
+    s.throttle = 1;
+  } else {
+    s.targetA = phi + s.orbit * PI / 2;
+    s.throttle = 0.55;
+  }
+}
+
+// Called when the player fires at a ship: smart crews try to swerve out of the way.
+function warnTarget(t, fromX, fromY) {
+  if (!t || !t.alive || t.team !== 'enemy' || t.d.boss) return;
+  if (!(t.smart || t.kind === 'cutter') || (t.dodgeCD || 0) > 0) return;
+  if (Math.random() > 0.3 + 0.45 * G.smart) return;
+  const incoming = Math.atan2(t.y - fromY, t.x - fromX);
+  const left = angDiff(incoming, t.a) > 0 ? 1 : -1;
+  t.evadeA = incoming + left * PI / 2;
+  t.evadeT = 0.75;
+  t.dodgeCD = 2.6 - G.smart;
+}
+
+// Cutters: sprint in from astern, rake with a broadside while passing, sprint away.
+function raiderAI(s, P, d, phi, dt) {
+  s.raidT = (s.raidT || 0) - dt;
+  if (s.raid === 'out') {
+    s.targetA = phi + PI + Math.sin(G.t + s.bobPh) * 0.5;
+    s.throttle = 1;
+    if (s.raidT <= 0 || d > 230) s.raid = 'in';
+    return;
+  }
+  const bx = P.x - Math.cos(P.a) * 30, by = P.y - Math.sin(P.a) * 30;
+  s.targetA = Math.atan2(by - s.y, bx - s.x) + s.orbit * 0.25;
+  s.throttle = 1;
+  if (d < 42 || s.reload['-1'] > 1.5 || s.reload['1'] > 1.5) { s.raid = 'out'; s.raidT = rand(2, 3.2); }
+}
+
+// Shadow ships: stalk, flare, then charge straight through the player as a phantom.
+function shadowAI(s, P, d, phi, dt) {
+  s.shadowT = (s.shadowT == null ? rand(2, 4) : s.shadowT) - dt;
+  if (!s.mode) s.mode = 'stalk';
+  if (s.mode === 'stalk') {
+    s.targetA = phi + s.orbit * (PI / 2 - clamp((d - 140) / 140, -1, 1));
+    s.throttle = 0.6;
+    if (s.shadowT <= 0 && d < 240) { s.mode = 'flare'; s.shadowT = 0.9; s.speed *= 0.3; }
+  } else if (s.mode === 'flare') {
+    const tgt = predictPos(P, d / 110);
+    s.aimX = tgt.x; s.aimY = tgt.y;
+    s.targetA = Math.atan2(s.aimY - s.y, s.aimX - s.x);
+    s.a = s.targetA;
+    s.throttle = 0;
+    if (s.shadowT <= 0) {
+      s.mode = 'ram'; s.shadowT = 2.2; s.hitPass = false; s.invuln = 2.2;
+      if (onScreen(s.x, s.y, 80)) Sound.fx.whistle();
+    }
+  } else if (s.mode === 'ram') {
+    s.speed = 110; s.throttle = 1; s.invuln = Math.max(s.invuln, 0.1);
+    if (Math.random() < dt * 30) part({ k: 'smoke', x: s.x, y: s.y, vx: 0, vy: 0, life: 0.5, s: 3, c: '#3a2058' });
+    if (!s.hitPass && P.alive && d < s.radius + P.radius + 2) {
+      s.hitPass = true;
+      damageShip(P, s.d.ram * difficulty(G.wave).dmg, P.x, P.y);
+      P.kx += Math.cos(s.a) * 40; P.ky += Math.sin(s.a) * 40;
+      part({ k: 'ring', x: P.x, y: P.y, life: 0.6, s: 14, c: '#c08aff' });
+    }
+    if (s.shadowT <= 0) { s.mode = 'solid'; s.shadowT = 2.6; s.invuln = 0; s.speed = 18; floatText(s.x, s.y - 14, 'EXPOSED!', '#c08aff', 1, 1.2); }
+  } else {
+    s.throttle = 0.3;
+    s.targetA = phi + PI / 2 * s.orbit;
+    if (s.shadowT <= 0) { s.mode = 'stalk'; s.shadowT = rand(3, 5); }
+  }
+}
+
+// --- Shipyard refits (available after wave 15) -----------------------------------------
+const REFITS = [
+  { id: 'length', name: 'LENGTHEN HULL', lines: ['+1 GUN/SIDE', '+30 HULL', 'BIGGER TARGET'], icon: 'cannon', max: 2, cost: (l) => 180 + l * 170 },
+  { id: 'beam', name: 'WIDEN BEAM', lines: ['-10% DAMAGE', '+45 HULL', 'SLOWER TURNS'], icon: 'heart', max: 2, cost: (l) => 160 + l * 150 },
+];
+const shipyardOpen = () => G.wave >= 15;
+
+// Player art grows with the refits; sprites are drawn on first use.
+function playerArtKey(L = G.up.length || 0, B = G.up.beam || 0) {
+  const key = 'player_' + L + '_' + B;
+  if (!SHIP_ART[key]) {
+    const base = SHIP_ART.player;
+    SHIP_ART[key] = {
+      ...base,
+      len: base.len + L * 5, beam: base.beam + B * 2,
+      masts: L === 0 ? base.masts : L === 1 ? [0.38, 0.0, -0.3] : [0.42, 0.12, -0.12, -0.36],
+      span: L === 0 ? base.span : L === 1 ? [0.92, 1.08, 0.95] : [0.9, 1.05, 1.05, 0.92],
+      guns: base.guns + L,
+    };
+  }
+  if (!Art.ships[key]) Art.ships[key] = renderShipFrames(SHIP_ART[key]);
+  return key;
+}
+
+function refreshPlayerArt() {
+  const P = G.player;
+  if (!P) return;
+  P.artKey = playerArtKey();
+  P.art = SHIP_ART[P.artKey];
+  P.radius = P.art.len * 0.38;
+}
+
+// Telegraph a shadow ship's charge with a flickering line.
+function drawThreats(ctx, cam) {
+  for (const s of G.ships) {
+    if (!s.alive || s.mode !== 'flare') continue;
+    const L = 220, a = s.a;
+    const pts = [[s.x - cam.cx, s.y - cam.cy], [s.x - cam.cx + Math.cos(a) * L, s.y - cam.cy + Math.sin(a) * L]];
+    pixLineDotted(ctx, pts, Math.floor(G.t * 16) % 2 ? '#c08aff' : '#ff4a6a', 3, Math.floor(G.t * 30));
   }
 }
