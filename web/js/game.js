@@ -32,7 +32,7 @@ const UPGRADES = [
   { id: 'sails', name: 'SAILS', desc: '+10% SPEED', icon: 'sails', max: 4, cost: (l) => 18 + l * 15 + l * l * 4 },
   { id: 'repair', name: 'REPAIR', desc: 'MEND HULL', icon: 'repair', repeat: true, cost: () => Math.max(4, Math.ceil((playerStats().maxHp - G.player.hp) * 0.3)) },
   { id: 'kegs', name: 'KEGS', desc: '+2 KEGS', icon: 'keg', repeat: true, cost: () => 12 },
-  { id: 'boat', name: 'SHIPWRIGHT', desc: '+1 BOAT', icon: 'boat', repeat: true, cost: () => 160 + 120 * (G.boatsBought || 0) },
+  { id: 'boat', name: 'SHIPWRIGHT', desc: '+1 BOAT', icon: 'boat', repeat: true, cost: () => { const n = G.boatsBought || 0; return 160 + 150 * n + 50 * n * n; } },
 ];
 
 const G = {
@@ -41,33 +41,36 @@ const G = {
   player: null, ships: [], balls: [], pending: [], parts: [], texts: [], pickups: [], kegs: [], lights: [],
   cam: { x: 0, y: 0 }, shake: 0, hitstop: 0, hurtFlash: 0, combo: 0, comboT: 0,
   spawnQueue: [], spawnT: 0, banner: null, wind: { a: 0.6, s: 1 }, tod: 1, stateT: 0,
-  up: { hull: 0, guns: 0, powder: 0, crew: 0, sails: 0 }, kegCount: 2,
+  up: { hull: 0, guns: 0, powder: 0, crew: 0, sails: 0, length: 0, beam: 0 }, kegCount: 2,
   power: { rapid: 0, fire: 0 }, barrelT: 8, coinStep: 0, coinStepT: 0,
   gulls: [], clouds: [], boss: null, hint: null, hintStep: 0, tutorial: !Store.get('tutorialDone', false),
   moved: 0, firedHit: false, shopPop: {}, goldBump: 0, savedT: 0, lives: 3, livesBump: 0,
-  mod: null, convoy: null, ease: false, lostThisWave: false, firstBurst: 1, flashT: 0, armorHint: false,
+  mod: null, convoy: null, ease: false, smart: 0, maxAlive: 99, slotN: 0, lostThisWave: false, firstBurst: 1, flashT: 0, armorHint: false,
 };
 
 function playerStats() {
   const u = G.up;
+  const L = u.length || 0, B = u.beam || 0;
   return {
-    maxHp: 100 + u.hull * 25,
-    guns: 3 + u.guns,
+    maxHp: 100 + u.hull * 25 + L * 30 + B * 45,
+    guns: 3 + u.guns + L,
+    armor: B * 0.1,
     dmg: 10 * (1 + u.powder * 0.2),
     reload: 1.9 * Math.pow(0.87, u.crew) * (G.power.rapid > 0 ? 0.4 : 1),
-    speedMul: 1 + u.sails * 0.1,
-    turnMul: 1 + u.sails * 0.07,
+    speedMul: (1 + u.sails * 0.1) * (1 - B * 0.03),
+    turnMul: (1 + u.sails * 0.07) * (1 - B * 0.08 - L * 0.04),
     range: 135 + u.powder * 3 + u.guns * 3,
   };
 }
 
 function makeShip(kind, x, y, a) {
   const d = SHIP_TYPES[kind];
-  const art = SHIP_ART[d.art];
+  const artKey = kind === 'player' ? playerArtKey() : d.art;
+  const art = SHIP_ART[artKey];
   const hpMul = kind === 'player' ? 1 : difficulty(G.wave).hp;
   const hp = kind === 'player' ? playerStats().maxHp : Math.round(d.hp * hpMul);
   return {
-    kind, d, art, team: kind === 'player' ? 'player' : 'enemy',
+    kind, d, art, artKey, team: kind === 'player' ? 'player' : 'enemy',
     x, y, a, targetA: a, speed: 0, throttle: kind === 'player' ? 0.4 : 0.8, cruise: 0.4,
     kx: 0, ky: 0, hp, maxHp: hp, alive: true, sinkT: 0, flashT: 0, hpShowT: 0, burn: 0,
     reload: { '-1': rand(0.6, 1.6), '1': rand(0.6, 1.6) },
@@ -130,7 +133,7 @@ function toTitle() {
   World.generate(randi(1, 1e9));
   G.state = 'title'; G.stateT = 0; G.tod = 1; G.wave = 0;
   G.ships = []; G.balls = []; G.pending = []; G.parts = []; G.pickups = []; G.kegs = []; G.texts = [];
-  G.up = { hull: 0, guns: 0, powder: 0, crew: 0, sails: 0 };
+  G.up = { hull: 0, guns: 0, powder: 0, crew: 0, sails: 0, length: 0, beam: 0 };
   G.player = makeShip('player', World.W / 2, World.H / 2, 0);
   G.player.throttle = 0.45;
   G.boss = null; G.banner = null; G.hint = null; G.mod = null; G.convoy = null; G.wind.s = 1;
@@ -140,7 +143,7 @@ function toTitle() {
 
 function newGame() {
   G.score = 0; G.gold = 0; G.kills = 0; G.goldEarned = 0; G.newBest = false;
-  G.up = { hull: 0, guns: 0, powder: 0, crew: 0, sails: 0 };
+  G.up = { hull: 0, guns: 0, powder: 0, crew: 0, sails: 0, length: 0, beam: 0 };
   G.kegCount = 2; G.power = { rapid: 0, fire: 0 }; G.combo = 0; G.comboT = 0; G.lives = MAX_LIVES;
   G.lostThisWave = false; G.armorHint = false; G.boatsBought = 0;
   G.hintStep = 0; G.moved = 0; G.firedHit = false;
@@ -167,6 +170,7 @@ function startWave(n) {
   G.spawnQueue = r.list.slice();
   G.spawnT = 1.2;
   G.firstBurst = r.burst;
+  G.smart = r.smart; G.maxAlive = r.maxAlive; G.slotN = 0;
   G.mod = r.mod;
   G.wind.s = r.mod === 'storm' ? 1.9 : 1;
   G.convoy = r.convoy ? { total: r.convoy, sunk: 0, escaped: 0 } : null;
@@ -200,6 +204,8 @@ function spawnEnemy(kind) {
   s.speed = s.d.speed * 0.6;
   s.entering = 1;
   if (kind === 'merchant') { if (!G.convoyAnchor) G.convoyAnchor = pos; s.a = Math.atan2(pos.y - P.y, pos.x - P.x); }
+  if (kind === 'shadow') floatText(P.x, P.y - 26, 'A SHADOW SHIP STIRS...', '#c08aff', 1, 2.2);
+  assignSmart(s);
   G.ships.push(s);
   if (s.d.boss) G.boss = s;
   return s;
@@ -228,7 +234,7 @@ function waveCleared() {
   if (G.tutorial) { G.tutorial = false; Store.set('tutorialDone', true); G.hint = null; }
 }
 
-function openShop() { G.state = 'shop'; G.stateT = 0; G.shopPop = {}; saveRun(G.wave + 1, false); }
+function openShop() { G.state = 'shop'; G.stateT = 0; G.shopPop = {}; G.shopPage = 'main'; saveRun(G.wave + 1, false); }
 
 function setSail() {
   const hp = G.player.hp;
@@ -260,7 +266,7 @@ function continueGame() {
   const r = loadRun();
   if (!r) { newGame(); return; }
   G.score = r.score | 0; G.gold = r.gold | 0; G.kills = r.kills | 0; G.goldEarned = r.goldEarned | 0; G.newBest = false;
-  G.up = { hull: 0, guns: 0, powder: 0, crew: 0, sails: 0, ...r.up };
+  G.up = { hull: 0, guns: 0, powder: 0, crew: 0, sails: 0, length: 0, beam: 0, ...r.up };
   G.kegCount = clamp(r.kegCount | 0, 0, 5); G.power = { rapid: 0, fire: 0 }; G.combo = 0; G.comboT = 0;
   G.lives = clamp(r.lives == null ? MAX_LIVES : r.lives | 0, 1, LIFE_CAP);
   G.tutorial = false; G.hint = null;
@@ -295,7 +301,8 @@ function buyUpgrade(u) {
   else {
     const before = ps.maxHp;
     G.up[u.id]++;
-    if (u.id === 'hull') G.player.hp += playerStats().maxHp - before;
+    G.player.hp += Math.max(0, playerStats().maxHp - before);
+    if (u.id === 'length' || u.id === 'beam') refreshPlayerArt();
   }
   G.player.maxHp = playerStats().maxHp;
   G.shopPop[u.id] = 1;
@@ -373,6 +380,7 @@ function fireBroadside(s, side, target) {
   s.reload[side] = st.reload * (s.team === 'player' ? 1 : rand(0.9, 1.25));
   const n = st.guns;
   for (let i = 0; i < n; i++) G.pending.push({ s, side, i, n, target, delay: i * 0.075 + (s.team === 'player' ? 0 : rand(0, 0.03)), st });
+  if (s.team === 'player' && target) warnTarget(target, s.x, s.y);
   return true;
 }
 
@@ -389,11 +397,11 @@ function launchBall(p) {
   let dir = norm + rand(-0.04, 0.04);
   let range = st.range * 0.86;
   if (target && target.alive) {
+    // Lead the target along its current turn, so tight circling is no refuge.
     let px = target.x, py = target.y;
-    const tvx = Math.cos(target.a) * target.speed, tvy = Math.sin(target.a) * target.speed;
-    for (let k = 0; k < 2; k++) {
-      const T = dist(gx, gy, px, py) / BALL_SPEED;
-      px = target.x + tvx * T; py = target.y + tvy * T;
+    for (let k = 0; k < 3; k++) {
+      const q = predictPos(target, dist(gx, gy, px, py) / BALL_SPEED);
+      px = q.x; py = q.y;
     }
     const aim = Math.atan2(py - gy, px - gx);
     const dev = angDiff(norm, aim);
@@ -422,9 +430,10 @@ function launchBall(p) {
 function damageShip(s, amount, x, y, opts = {}) {
   if (!s.alive) return;
   if (s.invuln > 0) { sparks(x, y, 3); return; }
-  const armored = s.d.armor && !opts.pierce;
+  const armorV = s.team === 'player' ? playerStats().armor : s.d.armor;
+  const armored = armorV > 0 && (s.team === 'player' || !opts.pierce);
   if (armored) {
-    amount *= 1 - s.d.armor;
+    amount *= 1 - armorV;
     sparks(x, y, 4);
     if (!G.armorHint && s.team === 'enemy') { G.armorHint = true; floatText(s.x, s.y - 22, 'ARMOR! KEGS PIERCE IT', '#b8c0cc', 1, 2.2); }
   }
@@ -472,7 +481,7 @@ function sinkShip(s) {
     G.hitstop = big ? 0.22 : 0.07;
     addShake(big ? 9 : 5);
     haptic('heavy');
-    const gold = Math.round(s.d.gold * (1 + (G.wave - 1) * 0.08));
+    const gold = Math.round(s.d.gold * (1 + Math.min(G.wave - 1, 30) * 0.065));
     const coins = Math.min(gold, big ? 36 : 14);
     for (let i = 0; i < coins; i++) {
       const v = Math.floor(gold / coins) + (i < gold % coins ? 1 : 0);
@@ -596,7 +605,15 @@ function enemyAI(s, dt) {
   const d = Math.hypot(dx, dy);
   const phi = Math.atan2(dy, dx);
   if (!P.alive) { s.targetA = phi + PI / 2; s.throttle = 0.4; return; }
-  if (s.kind === 'burner') {
+  if (s.dodgeCD > 0) s.dodgeCD -= dt;
+  if (s.d.ai === 'shadow') { shadowAI(s, P, d, phi, dt); return; }
+  if (s.evadeT > 0) {
+    // Swerving out of an incoming broadside.
+    s.evadeT -= dt;
+    s.targetA = s.evadeA; s.throttle = 1;
+  } else if (s.d.ai === 'raider') {
+    raiderAI(s, P, d, phi, dt);
+  } else if (s.kind === 'burner') {
     const T = d / (s.d.speed + 1);
     s.targetA = Math.atan2(P.y + Math.sin(P.a) * P.speed * T * 0.6 - s.y, P.x + Math.cos(P.a) * P.speed * T * 0.6 - s.x);
     s.throttle = 1;
@@ -609,6 +626,9 @@ function enemyAI(s, dt) {
       s.targetA = phi + PI + Math.sin(G.t * 0.6 + s.bobPh) * 0.6;
       s.throttle = d < 230 ? 1 : 0.65;
     }
+  } else if (s.smart && s.thinkT <= 0) {
+    s.thinkT = 0.12;
+    smartSteer(s, P, d, phi);
   } else if (s.thinkT <= 0) {
     s.thinkT = 0.15;
     const R = s.d.ai === 'artillery' ? 185 : s.d.ai === 'skirmish' ? s.d.range * 0.55 : s.d.range * 0.68;
@@ -671,8 +691,13 @@ function updateShip(s, dt) {
   const maxSp = s.d.speed * (isP ? ps.speedMul : 1) * (0.86 + 0.18 * Math.cos(s.a - G.wind.a) * G.wind.s);
   const turnBase = s.d.turn * (isP ? ps.turnMul : 1);
   const turn = turnBase * (0.5 + 0.5 * clamp(Math.abs(s.speed) / s.d.speed, 0, 1));
-  s.a += clamp(angDiff(s.a, s.targetA), -turn * dt, turn * dt);
-  s.speed = approach(s.speed, s.throttle * maxSp, s.d.accel * dt);
+  const da = clamp(angDiff(s.a, s.targetA), -turn * dt, turn * dt);
+  s.a += da;
+  s.omega = lerp(s.omega || 0, dt > 0 ? da / dt : 0, 0.15);
+  // Hard turns bleed speed: endless tight circles make a slow, easy target.
+  const turning = dt > 0 ? Math.abs(da) / (turn * dt + 1e-6) : 0;
+  const boost = s.evadeT > 0 ? 1.25 : 1;
+  s.speed = approach(s.speed, s.throttle * maxSp * boost * (1 - 0.32 * turning), s.d.accel * dt);
   s.kx *= Math.exp(-dt * 2.5); s.ky *= Math.exp(-dt * 2.5);
   const ox = s.x, oy = s.y;
   s.x += (Math.cos(s.a) * s.speed + s.kx) * dt;
@@ -686,7 +711,7 @@ function updateShip(s, dt) {
   // Land collision: test bow, midships and stern.
   const ca = Math.cos(s.a), sa = Math.sin(s.a), half = s.art.len * 0.42;
   let hitLand = false;
-  for (const u of [half, 0, -half]) {
+  for (const u of s.d.ghostly ? [] : [half, 0, -half]) {
     const px = s.x + ca * u, py = s.y + sa * u;
     if (World.heightAt(px, py) > LAND) {
       hitLand = true;
@@ -739,7 +764,7 @@ function shipCollisions() {
   const all = [G.player, ...G.ships];
   for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
     const a = all[i], b = all[j];
-    if (!a.alive || !b.alive) continue;
+    if (!a.alive || !b.alive || a.d.ghostly || b.d.ghostly) continue;
     const d = dist(a.x, a.y, b.x, b.y);
     const r = a.radius + b.radius;
     if (d >= r || d === 0) continue;
@@ -1005,10 +1030,10 @@ function update(dt) {
   if (G.state === 'playing') {
     G.spawnT -= dt;
     const alive = G.ships.filter((s) => s.alive).length;
-    if (G.spawnQueue.length && (G.spawnT <= 0 || alive === 0)) {
-      const burst = G.stateT < 2 ? Math.min(G.spawnQueue.length, G.firstBurst) : 1;
+    if (G.spawnQueue.length && (G.spawnT <= 0 || alive === 0) && alive < G.maxAlive) {
+      const burst = G.stateT < 2 ? Math.min(G.spawnQueue.length, G.firstBurst, G.maxAlive) : G.wave >= 15 ? Math.min(2, G.spawnQueue.length) : 1;
       for (let i = 0; i < burst; i++) spawnEnemy(G.spawnQueue.shift());
-      G.spawnT = rand(5, 8) - Math.min(2.5, G.wave * 0.15);
+      G.spawnT = G.wave >= 15 ? rand(3, 5) : rand(5, 8) - Math.min(2.5, G.wave * 0.15);
     }
     if (!G.spawnQueue.length && alive === 0 && G.stateT > 2) waveCleared();
   } else if (G.state === 'clearing') {
@@ -1055,7 +1080,7 @@ function pixLineDotted(ctx, pts, color, gap = 3, phase = 0) {
 }
 
 function drawShip(ctx, s, cx, cy) {
-  const spr = Art.ships[s.d.art];
+  const spr = Art.ships[s.artKey || s.d.art];
   const fi = Art.shipFrame(s.kind, s.a);
   const S = spr.size;
   const bob = Math.round(Math.sin(G.t * 2 + s.bobPh) * 0.6);
@@ -1078,6 +1103,7 @@ function drawShip(ctx, s, cx, cy) {
   const enter = s.entering;
   if (enter > 0) ctx.globalAlpha = 1 - enter * 0.7;
   if (s.d.phase) ctx.globalAlpha = s.invuln > 0 ? 0.25 : 0.85;
+  else if (s.d.ghostly) ctx.globalAlpha = s.mode === 'ram' ? 0.35 : s.mode === 'solid' ? 1 : s.mode === 'flare' ? (Math.floor(G.t * 16) % 2 ? 1 : 0.5) : 0.6;
   else if (s.invuln > 0 && Math.floor(G.t * 12) % 2) ctx.globalAlpha = 0.35;
   ctx.drawImage(s.flashT > 0 ? spr.flashes[fi] : spr.frames[fi], x, y);
   ctx.globalAlpha = 1;

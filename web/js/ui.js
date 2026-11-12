@@ -171,7 +171,7 @@ function drawArrows(ctx) {
     const pulse = Math.floor(G.t * 4) % 2;
     const sz = (s.d.boss ? 7 : 5) + pulse;
     const ca = Math.cos(a), sa = Math.sin(a);
-    const col = s.d.boss ? '#ffd23f' : s.kind === 'merchant' ? '#7dff9a' : s.kind === 'burner' ? '#ff9a3a' : '#ff4a4a';
+    const col = s.d.boss ? '#ffd23f' : s.kind === 'merchant' ? '#7dff9a' : s.kind === 'shadow' ? '#b07aff' : s.kind === 'cutter' ? '#5ae0ff' : s.kind === 'burner' ? '#ff9a3a' : '#ff4a4a';
     pixTri(ctx, x + ca * sz + ca, y + sa * sz + sa, x - sa * sz * 0.7 - ca * 2, y + ca * sz * 0.7 - sa * 2, x + sa * sz * 0.7 - ca * 2, y - ca * sz * 0.7 - sa * 2, INK);
     pixTri(ctx, x + ca * sz, y + sa * sz, x - sa * sz * 0.6 - ca, y + ca * sz * 0.6 - sa, x + sa * sz * 0.6 - ca, y - ca * sz * 0.6 - sa, col);
   }
@@ -416,6 +416,7 @@ function drawTitle(ctx) {
 }
 
 function drawShop(ctx) {
+  if (G.shopPage === 'yard') { drawShipyard(ctx); return; }
   dim(ctx, 0.55);
   const w = Math.min(view.w - 12 - view.safe.l - view.safe.r, 392), h = Math.min(view.h - 10, 200);
   const x = Math.round(view.w / 2 - w / 2), y = Math.round(view.h / 2 - h / 2);
@@ -477,8 +478,16 @@ function drawShop(ctx) {
   const ps = playerStats();
   const stats = ['HULL ' + Math.ceil(G.player.hp) + '/' + ps.maxHp + '  GUNS ' + ps.guns + '  KEGS ' + G.kegCount + '  BOATS ' + G.lives,
     'HULL ' + Math.ceil(G.player.hp) + '/' + ps.maxHp + '  BOATS ' + G.lives, 'BOATS ' + G.lives];
-  const room = w - 96 - 16;
-  Font.draw(ctx, stats.find((t) => Font.width(t) <= room) || stats[2], x + 10, py + h - 20, '#5a3518');
+  if (shipyardOpen()) {
+    const nw = !G.yardSeen && Math.floor(G.t * 3) % 2;
+    drawButton(ctx, 'yard', x + 8, py + h - 25, 88, 18, nw ? 'NEW! YARD' : 'SHIPYARD', () => { G.shopPage = 'yard'; G.yardSeen = true; }, { color: '#c08a2a' });
+    const room = w - 96 - 16 - 96;
+    const t = stats.find((q) => Font.width(q) <= room);
+    if (t) Font.draw(ctx, t, x + 104, py + h - 20, '#5a3518');
+  } else {
+    const room = w - 96 - 16;
+    Font.draw(ctx, stats.find((t) => Font.width(t) <= room) || stats[2], x + 10, py + h - 20, '#5a3518');
+  }
   drawButton(ctx, 'sail', x + w - 96, py + h - 25, 86, 18, 'SAVE + SAIL >', setSail, { color: '#4a9a3a' });
 }
 
@@ -536,3 +545,54 @@ function pauseGame() {
   Input.clearAll();
 }
 function resumeGame() { if (G.state === 'paused') { G.state = G.prevState || 'playing'; Input.clearAll(); } }
+
+// Shipyard: two refits that enlarge the ship, with a preview of the result.
+function drawShipyard(ctx) {
+  dim(ctx, 0.55);
+  const w = Math.min(view.w - 12 - view.safe.l - view.safe.r, 392), h = Math.min(view.h - 10, 200);
+  const x = Math.round(view.w / 2 - w / 2), py = Math.round(view.h / 2 - h / 2);
+  drawPanel(ctx, x, py, w, h, 'wood');
+  txt(ctx, 'SHIPYARD', x + 10, py + 9, '#ffd23f', { scale: 2, shadow: '#5a1a10', shadowOff: 2 });
+  const subs = ['BIGGER SHIP: MORE GUNS AND HULL, BUT EASIER TO HIT', 'BIGGER SHIP, BIGGER TARGET'];
+  Font.draw(ctx, subs.find((t) => Font.width(t) <= w - 20) || subs[1], x + 10, py + 27, '#5a3518');
+  ctx.drawImage(Art.icons.coin, x + w - 14 - Font.width(String(G.gold), 2) - 10, py + 11);
+  txt(ctx, G.gold, x + w - 12, py + 9, '#ffd23f', { align: 'right', scale: 2 });
+  const gap = 6, top = py + 38, bottom = py + h - 30;
+  const cw = Math.floor((w - 16 - gap) / 2), ch = bottom - top;
+  REFITS.forEach((u, i) => {
+    const cx = x + 8 + i * (cw + gap);
+    const lvl = G.up[u.id] || 0;
+    const maxed = lvl >= u.max;
+    const cost = u.cost(lvl);
+    uiButton('r_' + u.id, cx, top, cw, ch, () => buyUpgrade(u));
+    const oy = top + (UI.pressed === 'r_' + u.id ? 1 : 0) - Math.round((G.shopPop[u.id] || 0) * 3);
+    drawPanel(ctx, cx, oy, cw, ch, 'card');
+    txt(ctx, u.name, cx + cw / 2, oy + 4, '#ffffff', { align: 'center' });
+    // Preview the ship this refit produces (or the current one when maxed).
+    const L = (G.up.length || 0) + (u.id === 'length' && !maxed ? 1 : 0);
+    const B = (G.up.beam || 0) + (u.id === 'beam' && !maxed ? 1 : 0);
+    const spr = Art.ships[playerArtKey(L, B)];
+    const room = Math.max(20, ch - 52);
+    const fy = oy + 12 + Math.floor(room / 2);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(cx + 2, oy + 12, cw - 4, room); ctx.clip();
+    ctx.drawImage(spr.shadows[0], Math.round(cx + cw / 2 - spr.size / 2), Math.round(fy - spr.size / 2));
+    ctx.drawImage(spr.frames[0], Math.round(cx + cw / 2 - spr.size / 2), Math.round(fy - spr.size / 2));
+    ctx.restore();
+    const ly = oy + 12 + room + 1;
+    u.lines.forEach((t, k) => Font.draw(ctx, t, cx + 6, ly + k * 8, k === 2 ? '#ffb08a' : '#f0deb0'));
+    for (let p = 0; p < u.max; p++) {
+      ctx.fillStyle = INK; ctx.fillRect(cx + cw - 6 - (u.max - p) * 6, ly, 5, 5);
+      ctx.fillStyle = p < lvl ? '#ffd23f' : '#4a2a18'; ctx.fillRect(cx + cw - 6 - (u.max - p) * 6 + 1, ly + 1, 3, 3);
+    }
+    const label = maxed ? 'MAX' : String(cost);
+    const col = maxed ? '#9adfa0' : G.gold >= cost ? '#ffd23f' : '#ff6a5a';
+    txt(ctx, label, cx + cw - 5, oy + ch - 11, col, { align: 'right' });
+    if (!maxed) ctx.drawImage(Art.icons.coin, cx + cw - 5 - Font.width(label) - 8, oy + ch - 11);
+  });
+  drawButton(ctx, 'yardBack', x + 8, py + h - 25, 70, 18, '< HARBOR', () => { G.shopPage = 'main'; }, { color: '#8a5530' });
+  const ps = playerStats();
+  const st = 'HULL ' + Math.ceil(G.player.hp) + '/' + ps.maxHp + '  GUNS ' + ps.guns;
+  if (Font.width(st) < w - 96 - 90) Font.draw(ctx, st, x + 86, py + h - 20, '#5a3518');
+  drawButton(ctx, 'sail', x + w - 96, py + h - 25, 86, 18, 'SAVE + SAIL >', setSail, { color: '#4a9a3a' });
+}

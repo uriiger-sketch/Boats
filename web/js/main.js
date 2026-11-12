@@ -63,7 +63,10 @@
       case 'title': if (ok) { if (loadRun()) continueGame(); else newGame(); } break;
       case 'shop': {
         if (ok) setSail();
-        for (let i = 0; i < UPGRADES.length; i++) if (Input.edge(String(i + 1))) buyUpgrade(UPGRADES[i]);
+        const list = G.shopPage === 'yard' ? REFITS : UPGRADES;
+        for (let i = 0; i < list.length; i++) if (Input.edge(String(i + 1))) buyUpgrade(list[i]);
+        if (esc && G.shopPage === 'yard') G.shopPage = 'main';
+        if (Input.edge('y') && shipyardOpen()) { G.shopPage = 'yard'; G.yardSeen = true; }
         break;
       }
       case 'gameover': if (ok) newGame(); if (esc) toTitle(); break;
@@ -82,6 +85,7 @@
     const inGame = G.state === 'playing' || G.state === 'clearing' || G.state === 'sinking' || G.state === 'paused';
     if (inGame) {
       drawAim(ctx, cam);
+      drawThreats(ctx, cam);
       drawShipBars(ctx, cam);
       drawFloatTexts(ctx, cam);
       drawArrows(ctx);
